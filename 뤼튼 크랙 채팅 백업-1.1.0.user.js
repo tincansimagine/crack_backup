@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         뤼튼 크랙 채팅 백업
 // @namespace    http://tampermonkey.net/
-// @version      1.1.0
-// @description  뤼튼 크랙(Wrtn Crack) 웹사이트에서 채팅 내역을 백업하는 스크립트
+// @version      1.0.1
+// @description  뤼튼 크랙(Wrtn Crack) 웹사이트에서 채팅 내역을 백업하는 스크립트 (모바일 지원 강화, HTML 마크다운/목록 지원)
 // @author       케츠
 // @match        https://crack.wrtn.ai/*
 // @icon         https://crack.wrtn.ai/favicon.ico
@@ -83,12 +83,19 @@
         constructor() {
             this.chatList = [];
             this.currentChatMessages = [];
+            this.isMobile = window.innerWidth <= 768; // 모바일 환경 감지
         }
 
         // 사이드바에서 채팅 목록 추출
         async extractChatList() {
             try {
                 console.log('채팅 목록 추출 시작...');
+                console.log('모바일 환경 감지:', this.isMobile);
+
+                // 모바일인 경우 햄버거 메뉴 자동으로 열기
+                if (this.isMobile) {
+                    await this.openMobileMenu();
+                }
 
                 // 실제 사이드바 구조에 맞는 선택자들
                 const sidebarSelectors = [
@@ -109,6 +116,149 @@
                     throw new Error('사이드바 컨테이너를 찾을 수 없습니다.');
                 }
 
+                // 스크롤 가능한 컨테이너 찾기
+                let scrollContainer = this.chatScrollContainer; // openMobileMenu에서 저장한 컨테이너 활용
+
+                // 아직 찾지 못했다면 다시 시도
+                if (!scrollContainer) {
+                    scrollContainer = chatListContainer.querySelector('[class*="css-kvsjdq"]') ||
+                                     chatListContainer.querySelector('[style*="overflow-y"]') ||
+                                     chatListContainer.querySelector('[class*="scroll"]') ||
+                                     chatListContainer;
+                }
+
+                console.log('스크롤 컨테이너 찾음:', scrollContainer);
+
+                // 채팅 항목 확인 (최소 1개 이상 항목이 있는지)
+                const initialChatItems = scrollContainer.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
+                if (initialChatItems.length === 0) {
+                    // 컨테이너에 채팅 항목이 없으면 부모 요소나 다른 컨테이너 찾기 시도
+                    console.log('선택된 컨테이너에 채팅 항목이 없습니다. 다른 컨테이너 찾기 시도...');
+
+                    // 다른 컨테이너 후보들 확인
+                    const containerCandidates = [
+                        document.querySelector('div[class*="css-kvsjdq"]'),
+                        document.querySelector('div[class*="flex"][width="100%"][height="100%"]'),
+                        document.querySelector('div[class*="scroll"]'),
+                        document.querySelectorAll('a[href*="/u/"][href*="/c/"]')[0]?.closest('div[class*="flex"]')
+                    ].filter(Boolean);
+
+                    for (const candidate of containerCandidates) {
+                        const items = candidate.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
+                        if (items.length > 0) {
+                            scrollContainer = candidate;
+                            console.log('새로운 스크롤 컨테이너 발견:', scrollContainer);
+                            break;
+                        }
+                    }
+                }
+
+                // 자동 스크롤로 모든 채팅방 로드
+                let previousHeight = 0;
+                let currentHeight = scrollContainer.scrollHeight;
+                let scrollAttempts = 0;
+                let noChangeCount = 0;
+                const maxScrollAttempts = this.isMobile ? 100 : 50; // 모바일에서는 더 많은 스크롤 시도
+                const waitTime = this.isMobile ? 800 : 500; // 모바일에서는 대기 시간 증가
+
+                console.log('채팅방 목록 자동 로드 시작...');
+
+                // 이전 채팅방 수 기록
+                let previousChatCount = 0;
+
+                while (scrollAttempts < maxScrollAttempts) {
+                    // 현재 채팅방 수 확인
+                    const currentChatItems = scrollContainer.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
+                    const currentChatCount = currentChatItems.length;
+
+                    console.log(`현재 채팅방 수: ${currentChatCount}, 이전 채팅방 수: ${previousChatCount}`);
+
+                    // 스크롤 진행
+                    if (this.isMobile) {
+                        // 모바일에서는 점진적으로 스크롤
+                        const scrollStep = 300; // 한 번에 300px씩 스크롤
+                        const currentScrollTop = scrollContainer.scrollTop;
+                        scrollContainer.scrollTop += scrollStep;
+
+                        console.log(`모바일 스크롤 단계적 진행: ${currentScrollTop} → ${scrollContainer.scrollTop}`);
+                    } else {
+                        // PC에서는 한 번에 맨 아래로 스크롤
+                        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+                    }
+
+                    // 스크롤 진행 상황 이벤트 발생
+                    const scrollPercent = Math.min(100, (scrollAttempts / maxScrollAttempts) * 100);
+                    document.dispatchEvent(new CustomEvent('wrtn_scroll_progress', {
+                        detail: { percent: scrollPercent, attempt: scrollAttempts, max: maxScrollAttempts }
+                    }));
+
+                    // 새로운 콘텐츠 로드 대기
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+
+                    // 스크롤 후 변화 확인
+                    previousHeight = currentHeight;
+                    currentHeight = scrollContainer.scrollHeight;
+
+                    // 모바일에서 추가 대기 (API 응답 대기)
+                    if (this.isMobile) {
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                    }
+
+                    // 스크롤 높이 변화 없고, 채팅방 수도 동일하면 카운트 증가
+                    if (previousHeight === currentHeight && previousChatCount === currentChatCount) {
+                        noChangeCount++;
+                        console.log(`변화 없음 카운트: ${noChangeCount}/5`);
+
+                        // 5번 연속으로 변화가 없으면 스크롤 종료
+                        if (noChangeCount >= 5) {
+                            // 한 번 더 시도 (모바일에서 가끔 지연 로딩됨)
+                            if (this.isMobile) {
+                                scrollContainer.scrollTop = scrollContainer.scrollHeight;
+                                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                                // 마지막 확인
+                                const finalChatItems = scrollContainer.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
+                                if (finalChatItems.length > currentChatCount) {
+                                    console.log(`마지막 시도 후 채팅방 증가: ${currentChatCount} → ${finalChatItems.length}`);
+                                    continue; // 채팅방이 증가했으면 계속 스크롤
+                                }
+                            }
+
+                            console.log('5번 연속으로 변화가 없어 스크롤 종료');
+                            break;
+                        }
+                    } else {
+                        // 변화가 있으면 카운트 리셋
+                        noChangeCount = 0;
+                    }
+
+                    // 채팅방 수 업데이트
+                    previousChatCount = currentChatCount;
+
+                    scrollAttempts++;
+                    console.log(`스크롤 시도 ${scrollAttempts}: 이전 높이=${previousHeight}, 현재 높이=${currentHeight}`);
+
+                    // 모바일에서 스크롤이 맨 아래에 도달하면 상태 확인
+                    if (this.isMobile && scrollContainer.scrollTop + scrollContainer.clientHeight >= scrollContainer.scrollHeight - 10) {
+                        console.log('모바일 스크롤이 맨 아래에 도달함, 추가 로딩 대기...');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+
+                        // 스크롤을 약간 위로 올렸다 다시 내리기 (추가 로딩 트리거)
+                        scrollContainer.scrollTop -= 50;
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+
+                console.log(`자동 스크롤 완료. 총 ${scrollAttempts}회 스크롤`);
+
+                // 스크롤을 맨 위로 되돌리기 (선택사항)
+                scrollContainer.scrollTop = 0;
+
+                // 약간의 대기 시간 후 채팅 항목 찾기
+                await new Promise(resolve => setTimeout(resolve, 300));
+
                 // 채팅 항목들 찾기 - 다양한 선택자 시도
                 const chatSelectors = [
                     'a[href*="/u/"][href*="/c/"]',
@@ -120,7 +270,7 @@
 
                 let chatItems = [];
                 for (const selector of chatSelectors) {
-                    chatItems = chatListContainer.querySelectorAll(selector);
+                    chatItems = scrollContainer.querySelectorAll(selector);
                     if (chatItems.length > 0) {
                         console.log(`${selector}로 ${chatItems.length}개 항목 발견`);
                         break;
@@ -209,11 +359,215 @@
                     };
                 });
 
+                // 모바일 환경에서 열었던 메뉴 닫기 (선택사항)
+                if (this.isMobile) {
+                    this.closeMobileMenu();
+                }
+
                 console.log('채팅 목록 추출 완료:', this.chatList);
                 return this.chatList;
             } catch (error) {
                 console.error('채팅 목록 추출 실패:', error);
                 throw error;
+            }
+        }
+
+        // 모바일 환경에서 햄버거 메뉴 열기
+        async openMobileMenu() {
+            console.log('모바일 햄버거 메뉴 열기 시도...');
+
+            // 먼저 채팅 목록이 이미 표시되어 있는지 확인 (우측 사이드바에 있을 수 있음)
+            const chatItems = document.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
+            if (chatItems.length > 0) {
+                console.log(`채팅 목록이 이미 표시되어 있습니다. ${chatItems.length}개 항목 발견.`);
+
+                // 스크롤 컨테이너 찾기 시도
+                const scrollContainers = [
+                    'div[class*="css-kvsjdq"]',
+                    'div[class*="scroll"]',
+                    'div[style*="overflow"]',
+                    'div[class*="flex"]',
+                    'aside div[display="flex"][width="100%"][height="100%"]'
+                ];
+
+                for (const selector of scrollContainers) {
+                    const container = document.querySelector(selector);
+                    if (container && container.contains(chatItems[0])) {
+                        console.log(`채팅 목록 스크롤 컨테이너 발견: ${selector}`);
+                        // 컨테이너를 저장해두면 extractChatList에서 활용 가능
+                        this.chatScrollContainer = container;
+                        return true;
+                    }
+                }
+
+                // 명확한 컨테이너를 찾지 못했지만 채팅 목록은 있음
+                return true;
+            }
+
+            // 햄버거 메뉴 버튼 찾기 (다양한 선택자 시도)
+            const hamburgerSelectors = [
+                'button.css-19ekx34',
+                'button.e1h4uvut1',
+                'button[display="flex"][height="40px"]',
+                'button svg[viewBox="0 0 24 24"][width="24"][height="24"]',
+                'button svg path[d="M21 6.4H3V4.8h18zm0 6.5H3v-1.6h18zM3 19.4h18v-1.6H3z"]'
+            ];
+
+            let hamburgerButton = null;
+            for (const selector of hamburgerSelectors) {
+                const btn = document.querySelector(selector);
+                if (btn) {
+                    hamburgerButton = btn.tagName === 'BUTTON' ? btn : btn.closest('button');
+                    if (hamburgerButton) {
+                        console.log(`햄버거 버튼 발견: ${selector}`);
+                        break;
+                    }
+                }
+            }
+
+            if (!hamburgerButton) {
+                console.warn('햄버거 메뉴 버튼을 찾을 수 없습니다. 대화 목록이 이미 표시되어 있는지 확인합니다.');
+                return false;
+            }
+
+            // 사이드바 열려있는지 확인
+            // 사이드바 선택자들
+            const sidebarSelectors = [
+                'aside',
+                '[class*="sidebar"]',
+                '[class*="side"]',
+                '.css-kvsjdq', // 채팅 목록 컨테이너
+                'div[class*="css-"] > a[href*="/u/"][href*="/c/"]' // 채팅 항목이 있는 컨테이너
+            ];
+
+            // 우측 사이드바와 좌측 사이드바 모두 확인
+            const sidebarElements = [];
+            for (const selector of sidebarSelectors) {
+                const elements = document.querySelectorAll(selector);
+                elements.forEach(element => {
+                    if (window.getComputedStyle(element).display !== 'none') {
+                        sidebarElements.push(element);
+                        console.log(`사이드바 요소 발견: ${selector}`);
+                    }
+                });
+            }
+
+            // 사이드바 내에서 채팅 목록 확인
+            for (const sidebar of sidebarElements) {
+                const chatItemsInSidebar = sidebar.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
+                if (chatItemsInSidebar.length > 0) {
+                    console.log(`사이드바에서 ${chatItemsInSidebar.length}개 채팅 항목 발견`);
+
+                    // 스크롤 컨테이너 찾기
+                    const scrollContainers = [
+                        'div[class*="css-kvsjdq"]',
+                        'div[class*="scroll"]',
+                        'div[style*="overflow"]',
+                        'div[display="flex"][width="100%"][height="100%"]'
+                    ];
+
+                    for (const selector of scrollContainers) {
+                        const container = sidebar.querySelector(selector);
+                        if (container && container.contains(chatItemsInSidebar[0])) {
+                            console.log(`채팅 목록 스크롤 컨테이너 발견: ${selector}`);
+                            this.chatScrollContainer = container;
+                            break;
+                        }
+                    }
+
+                    return true;
+                }
+            }
+
+            // 아직 채팅 목록이 표시되지 않았으면 햄버거 버튼 클릭
+            console.log('햄버거 메뉴 버튼 클릭...');
+            hamburgerButton.click();
+
+            // 사이드바가 나타날 때까지 대기
+            let attempts = 0;
+            const maxAttempts = 10;
+
+            while (attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // 사이드바 확인
+                for (const selector of sidebarSelectors) {
+                    const element = document.querySelector(selector);
+                    if (element && window.getComputedStyle(element).display !== 'none') {
+                        console.log(`사이드바가 나타남: ${selector}`);
+
+                        // 채팅 항목 확인
+                        const chatItems = element.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
+                        if (chatItems.length > 0) {
+                            console.log(`사이드바에서 ${chatItems.length}개 채팅 항목 발견`);
+
+                            // 스크롤 컨테이너 찾기
+                            const scrollContainers = [
+                                'div[class*="css-kvsjdq"]',
+                                'div[class*="scroll"]',
+                                'div[style*="overflow"]',
+                                'div[display="flex"][width="100%"][height="100%"]'
+                            ];
+
+                            for (const scrollSelector of scrollContainers) {
+                                const container = element.querySelector(scrollSelector);
+                                if (container && container.contains(chatItems[0])) {
+                                    console.log(`채팅 목록 스크롤 컨테이너 발견: ${scrollSelector}`);
+                                    this.chatScrollContainer = container;
+                                    break;
+                                }
+                            }
+
+                            // 추가 로딩 시간 대기
+                            await new Promise(resolve => setTimeout(resolve, 800));
+                            return true;
+                        }
+
+                        // 채팅 탭 버튼 클릭 필요할 수 있음
+                        const chatTabSelectors = [
+                            'button[class*="chat"]',
+                            'a[href="/"]',
+                            'div[class*="tab"]',
+                            'a[class*="tab"]',
+                            'p[class*="css-6pyka7"]'
+                        ];
+
+                        for (const tabSelector of chatTabSelectors) {
+                            const buttons = element.querySelectorAll(tabSelector);
+                            for (const btn of buttons) {
+                                if (btn.textContent.includes('대화') || btn.textContent.includes('채팅') || btn.textContent.includes('chat')) {
+                                    console.log('채팅 탭 버튼 클릭 시도...');
+                                    btn.click();
+                                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                                    // 클릭 후 채팅 항목 확인
+                                    const items = element.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
+                                    if (items.length > 0) {
+                                        console.log(`채팅 탭 클릭 후 ${items.length}개 항목 발견`);
+                                        return true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                attempts++;
+            }
+
+            console.warn('사이드바를 열거나 채팅 항목을 찾지 못했습니다.');
+            return false;
+        }
+
+        // 모바일 환경에서 햄버거 메뉴 닫기
+        closeMobileMenu() {
+            // 백업 작업이 끝난 후 메뉴를 닫을지 여부는 선택사항
+            // 닫고 싶다면 다시 햄버거 버튼 찾아서 클릭
+            const hamburgerButton = document.querySelector('button.css-19ekx34, button.e1h4uvut1, button[display="flex"][height="40px"]');
+
+            if (hamburgerButton) {
+                console.log('햄버거 메뉴 닫기...');
+                hamburgerButton.click();
             }
         }
 
@@ -261,49 +615,74 @@
                         // 캐릭터 메시지 내용 추출
                         const messageContainer = item.querySelector('.css-jswf15');
                         if (messageContainer) {
-                            // 메시지 컨테이너의 직접 자식 요소들을 순서대로 처리
-                            const childElements = messageContainer.children;
+                            // 원본 HTML과 텍스트를 모두 확인하여 가장 완전한 내용 추출
+                            const htmlContent = messageContainer.innerHTML;
+                            const textContent = messageContainer.textContent || messageContainer.innerText;
 
-                            for (let childElement of childElements) {
-                                if (childElement.classList.contains('css-l6zbeu')) {
-                                    // 텍스트 콘텐츠
-                                    let paragraphNodes = [];
+                            console.log('캐릭터 메시지 원본 텍스트:', textContent);
+                            console.log('캐릭터 메시지 HTML:', htmlContent);
 
-                                    childElement.childNodes.forEach(node => {
-                                        if (node.nodeType === Node.TEXT_NODE) {
-                                            const text = node.textContent;
-                                            if (text.trim()) {
-                                                paragraphNodes.push({type: 'text', content: text});
-                                            }
-                                        } else if (node.nodeType === Node.ELEMENT_NODE) {
-                                            if (node.tagName === 'EM') {
-                                                paragraphNodes.push({type: 'text', content: node.textContent, emphasis: true});
-                                            } else if (node.tagName === 'BR') {
-                                                paragraphNodes.push({type: 'linebreak'});
-                                            } else {
-                                                const nodeText = node.textContent;
-                                                if (nodeText.trim()) {
-                                                    paragraphNodes.push({type: 'text', content: nodeText});
+                            // HTML에서 마크다운 요소들을 확인
+                            const hasCodeBlock = messageContainer.querySelector('pre code') !== null;
+                            const hasBlockquote = messageContainer.querySelector('blockquote') !== null;
+                            const hasHeading = messageContainer.querySelector('h1, h2, h3, h4, h5, h6') !== null;
+                            const hasMarkdownElements = hasCodeBlock || hasBlockquote || hasHeading;
+
+                            console.log('코드블럭 감지:', hasCodeBlock, '인용구 감지:', hasBlockquote, '헤딩 감지:', hasHeading);
+
+                            if (hasMarkdownElements) {
+                                // 마크다운 요소가 있는 경우 HTML을 파싱하여 원본 마크다운 형태로 복원
+                                console.log('마크다운 요소 감지됨 - HTML 파싱하여 처리');
+                                content.push({
+                                    type: 'markdown',
+                                    htmlContent: messageContainer.outerHTML, // DOM 요소 대신 HTML 문자열 저장
+                                    isHtml: true // HTML로 렌더링된 상태임을 표시
+                                });
+                            } else {
+                                // 일반적인 메시지는 기존 방식으로 처리
+                                const childElements = messageContainer.children;
+
+                                for (let childElement of childElements) {
+                                    if (childElement.classList.contains('css-l6zbeu')) {
+                                        // 텍스트 콘텐츠
+                                        let paragraphNodes = [];
+
+                                        childElement.childNodes.forEach(node => {
+                                            if (node.nodeType === Node.TEXT_NODE) {
+                                                const text = node.textContent;
+                                                if (text.trim()) {
+                                                    paragraphNodes.push({type: 'text', content: text});
+                                                }
+                                            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                                if (node.tagName === 'EM') {
+                                                    paragraphNodes.push({type: 'text', content: node.textContent, emphasis: true});
+                                                } else if (node.tagName === 'BR') {
+                                                    paragraphNodes.push({type: 'linebreak'});
+                                                } else {
+                                                    const nodeText = node.textContent;
+                                                    if (nodeText.trim()) {
+                                                        paragraphNodes.push({type: 'text', content: nodeText});
+                                                    }
                                                 }
                                             }
-                                        }
-                                    });
+                                        });
 
-                                    if (paragraphNodes.length > 0) {
-                                        content.push({
-                                            type: 'paragraph',
-                                            nodes: paragraphNodes
-                                        });
-                                    }
-                                } else if (childElement.classList.contains('css-obwzop')) {
-                                    // 이미지 컨테이너
-                                    const img = childElement.querySelector('img.css-1xeqs9p');
-                                    if (img) {
-                                        content.push({
-                                            type: 'image',
-                                            url: img.src,
-                                            alt: img.alt || '이미지'
-                                        });
+                                        if (paragraphNodes.length > 0) {
+                                            content.push({
+                                                type: 'paragraph',
+                                                nodes: paragraphNodes
+                                            });
+                                        }
+                                    } else if (childElement.classList.contains('css-obwzop')) {
+                                        // 이미지 컨테이너
+                                        const img = childElement.querySelector('img.css-1xeqs9p');
+                                        if (img) {
+                                            content.push({
+                                                type: 'image',
+                                                url: img.src,
+                                                alt: img.alt || '이미지'
+                                            });
+                                        }
                                     }
                                 }
                             }
@@ -316,67 +695,92 @@
                         // 사용자 메시지 내용 추출 - 여러 선택자 시도
                         const userMessageContainer = item.querySelector('.css-jswf15');
                         if (userMessageContainer) {
-                            // 메시지 컨테이너의 직접 자식 요소들을 순서대로 처리
-                            const childElements = userMessageContainer.children;
+                            // 원본 HTML과 텍스트를 모두 확인하여 가장 완전한 내용 추출
+                            const htmlContent = userMessageContainer.innerHTML;
+                            const textContent = userMessageContainer.textContent || userMessageContainer.innerText;
 
-                            for (let childElement of childElements) {
-                                if (childElement.classList.contains('css-l8rc0l')) {
-                                    // 사용자 텍스트 콘텐츠
-                                    let paragraphNodes = [];
+                            console.log('사용자 메시지 원본 텍스트:', textContent);
+                            console.log('사용자 메시지 HTML:', htmlContent);
 
-                                    childElement.childNodes.forEach(node => {
-                                        if (node.nodeType === Node.TEXT_NODE) {
-                                            const text = node.textContent;
-                                            if (text.trim()) {
-                                                paragraphNodes.push({type: 'text', content: text});
-                                            }
-                                        } else if (node.nodeType === Node.ELEMENT_NODE) {
-                                            if (node.tagName === 'EM') {
-                                                paragraphNodes.push({type: 'text', content: node.textContent, emphasis: true});
-                                            } else if (node.tagName === 'BR') {
-                                                paragraphNodes.push({type: 'linebreak'});
-                                            } else if (node.tagName === 'IMG') {
-                                                paragraphNodes.push({
-                                                    type: 'image',
-                                                    url: node.src,
-                                                    alt: node.alt || '이미지'
-                                                });
-                                            } else {
-                                                const nodeText = node.textContent;
-                                                if (nodeText.trim()) {
-                                                    paragraphNodes.push({type: 'text', content: nodeText});
+                            // HTML에서 마크다운 요소들을 확인
+                            const hasCodeBlock = userMessageContainer.querySelector('pre code') !== null;
+                            const hasBlockquote = userMessageContainer.querySelector('blockquote') !== null;
+                            const hasHeading = userMessageContainer.querySelector('h1, h2, h3, h4, h5, h6') !== null;
+                            const hasMarkdownElements = hasCodeBlock || hasBlockquote || hasHeading;
+
+                            console.log('사용자 - 코드블럭 감지:', hasCodeBlock, '인용구 감지:', hasBlockquote, '헤딩 감지:', hasHeading);
+
+                            if (hasMarkdownElements) {
+                                // 마크다운 요소가 있는 경우 HTML을 파싱하여 처리
+                                console.log('사용자 메시지에서 마크다운 요소 감지됨 - HTML 파싱하여 처리');
+                                content.push({
+                                    type: 'markdown',
+                                    htmlContent: userMessageContainer.outerHTML, // DOM 요소 대신 HTML 문자열 저장
+                                    isHtml: true
+                                });
+                            } else {
+                                // 일반적인 메시지는 기존 방식으로 처리
+                                const childElements = userMessageContainer.children;
+
+                                for (let childElement of childElements) {
+                                    if (childElement.classList.contains('css-l8rc0l')) {
+                                        // 사용자 텍스트 콘텐츠
+                                        let paragraphNodes = [];
+
+                                        childElement.childNodes.forEach(node => {
+                                            if (node.nodeType === Node.TEXT_NODE) {
+                                                const text = node.textContent;
+                                                if (text.trim()) {
+                                                    paragraphNodes.push({type: 'text', content: text});
                                                 }
-
-                                                // 내부에 이미지가 있는지 확인
-                                                const nestedImages = node.querySelectorAll('img');
-                                                if (nestedImages.length > 0) {
-                                                    nestedImages.forEach(img => {
-                                                        paragraphNodes.push({
-                                                            type: 'image',
-                                                            url: img.src,
-                                                            alt: img.alt || '이미지'
-                                                        });
+                                            } else if (node.nodeType === Node.ELEMENT_NODE) {
+                                                if (node.tagName === 'EM') {
+                                                    paragraphNodes.push({type: 'text', content: node.textContent, emphasis: true});
+                                                } else if (node.tagName === 'BR') {
+                                                    paragraphNodes.push({type: 'linebreak'});
+                                                } else if (node.tagName === 'IMG') {
+                                                    paragraphNodes.push({
+                                                        type: 'image',
+                                                        url: node.src,
+                                                        alt: node.alt || '이미지'
                                                     });
+                                                } else {
+                                                    const nodeText = node.textContent;
+                                                    if (nodeText.trim()) {
+                                                        paragraphNodes.push({type: 'text', content: nodeText});
+                                                    }
+
+                                                    // 내부에 이미지가 있는지 확인
+                                                    const nestedImages = node.querySelectorAll('img');
+                                                    if (nestedImages.length > 0) {
+                                                        nestedImages.forEach(img => {
+                                                            paragraphNodes.push({
+                                                                type: 'image',
+                                                                url: img.src,
+                                                                alt: img.alt || '이미지'
+                                                            });
+                                                        });
+                                                    }
                                                 }
                                             }
-                                        }
-                                    });
+                                        });
 
-                                    if (paragraphNodes.length > 0) {
-                                        content.push({
-                                            type: 'paragraph',
-                                            nodes: paragraphNodes
-                                        });
-                                    }
-                                } else if (childElement.classList.contains('css-obwzop')) {
-                                    // 이미지 컨테이너
-                                    const img = childElement.querySelector('img.css-1xeqs9p');
-                                    if (img) {
-                                        content.push({
-                                            type: 'image',
-                                            url: img.src,
-                                            alt: img.alt || '이미지'
-                                        });
+                                        if (paragraphNodes.length > 0) {
+                                            content.push({
+                                                type: 'paragraph',
+                                                nodes: paragraphNodes
+                                            });
+                                        }
+                                    } else if (childElement.classList.contains('css-obwzop')) {
+                                        // 이미지 컨테이너
+                                        const img = childElement.querySelector('img.css-1xeqs9p');
+                                        if (img) {
+                                            content.push({
+                                                type: 'image',
+                                                url: img.src,
+                                                alt: img.alt || '이미지'
+                                            });
+                                        }
                                     }
                                 }
                             }
@@ -626,91 +1030,60 @@
 
         async createUI() {
             try {
-                // 상단 메뉴 컨테이너 찾기 (캐즘 버너 참고)
-                await utils.waitForElement('.css-uxwch2');
-                const menuContainer = document.querySelector('.css-uxwch2');
+                // 사이드바 메뉴에 백업 버튼 추가 시도
+                await this.addToSidebar();
 
-                if (!menuContainer || document.getElementById('crackBackupMenu')) {
-                    return;
+                // createFallbackButton 호출 제거 - 중복 버튼 제거
+                console.log('백업 버튼이 사이드바 메뉴에 통합되었습니다.');
+
+                // 백업 진행 중인 경우 체크
+                const inProgress = localStorage.getItem('wrtn_backup_in_progress') === 'true';
+                if (inProgress) {
+                    console.log('진행 중인 백업 감지됨. 재개 중...');
+                    this.resumeBackupProcess(null);
                 }
-
-                // 백업 메뉴 생성
-                const backupWrap = document.createElement('div');
-                backupWrap.id = 'crackBackupWrap';
-                backupWrap.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
-
-                const backupMenu = document.createElement('div');
-                backupMenu.id = 'crackBackupMenu';
-                backupMenu.className = 'css-5w39sj'; // 캐즘 버너와 동일한 클래스 사용
-                backupMenu.style.cssText = 'display: flex; cursor: pointer;';
-                backupMenu.innerHTML = `
-                    <p color="text_primary" class="css-1xke5yy">
-                        <span style="padding-right: 6px;">💾</span>채팅 백업
-                    </p>
-                    <div class="css-13pmxen" style="display: flex;"></div>
-                `;
-
-                backupMenu.addEventListener('click', () => this.showBackupModal());
-
-                backupWrap.appendChild(backupMenu);
-                menuContainer.appendChild(backupWrap);
-
-                console.log('💾 뤼튼 크랙 채팅 백업 메뉴가 추가되었습니다!');
             } catch (error) {
-                console.error('백업 UI 생성 실패:', error);
-                // 폴백: 기존 방식으로 버튼 생성
-                this.createFallbackButton();
+                console.error('UI 생성 중 오류:', error);
             }
         }
 
-        createFallbackButton() {
-            // 기존 버튼이 있다면 제거
-            const existingButton = document.getElementById('crack-backup-button');
-            if (existingButton) {
-                existingButton.remove();
+        async addToSidebar() {
+            // 상단 메뉴 컨테이너 찾기 (캐즘 버너 참고)
+            await utils.waitForElement('.css-uxwch2');
+            const menuContainer = document.querySelector('.css-uxwch2');
+
+            if (!menuContainer || document.getElementById('crackBackupMenu')) {
+                return;
             }
 
-            // 백업 버튼 스타일 - 더 눈에 띄게 수정
-            const buttonStyle = `
-                position: fixed;
-                bottom: 30px;
-                right: 30px;
-                z-index: 99999;
-                background: linear-gradient(45deg, #FF4432, #FF6B5A);
-                color: white;
-                border: none;
-                border-radius: 50px;
-                padding: 16px 24px;
-                font-size: 16px;
-                font-weight: 700;
-                cursor: pointer;
-                box-shadow: 0 6px 20px rgba(255, 68, 50, 0.4);
-                transition: all 0.3s ease;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                user-select: none;
-                border: 2px solid rgba(255, 255, 255, 0.2);
+            // 백업 메뉴 생성
+            const backupWrap = document.createElement('div');
+            backupWrap.id = 'crackBackupWrap';
+            backupWrap.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
+
+            const backupMenu = document.createElement('div');
+            backupMenu.id = 'crackBackupMenu';
+            backupMenu.className = 'css-5w39sj'; // 캐즘 버너와 동일한 클래스 사용
+            backupMenu.style.cssText = 'display: flex; cursor: pointer;';
+            backupMenu.innerHTML = `
+                <p color="text_primary" class="css-1xke5yy">
+                    <span style="padding-right: 6px;">💾</span>채팅 백업
+                </p>
+                <div class="css-13pmxen" style="display: flex;"></div>
             `;
 
-            // 백업 버튼 생성
-            this.backupButton = document.createElement('button');
-            this.backupButton.id = 'crack-backup-button';
-            this.backupButton.textContent = CONFIG.buttonText;
-            this.backupButton.style.cssText = buttonStyle;
-            this.backupButton.addEventListener('click', () => this.showBackupModal());
+            backupMenu.addEventListener('click', () => this.showBackupModal());
 
-            // 호버 효과
-            this.backupButton.addEventListener('mouseenter', () => {
-                this.backupButton.style.transform = 'translateY(-3px) scale(1.05)';
-                this.backupButton.style.boxShadow = '0 8px 25px rgba(255, 68, 50, 0.6)';
-            });
+            backupWrap.appendChild(backupMenu);
+            menuContainer.appendChild(backupWrap);
 
-            this.backupButton.addEventListener('mouseleave', () => {
-                this.backupButton.style.transform = 'translateY(0) scale(1)';
-                this.backupButton.style.boxShadow = '0 6px 20px rgba(255, 68, 50, 0.4)';
-            });
+            console.log('💾 뤼튼 크랙 채팅 백업 메뉴가 추가되었습니다!');
+        }
 
-            // 페이지에 버튼 추가
-            document.body.appendChild(this.backupButton);
+        async addToChatMenu() {
+            // 채팅방 메뉴에 백업 버튼 추가는 이미 사이드바에서 처리됨
+            // 중복 버튼 생성 방지를 위해 이 메서드는 아무것도 하지 않음
+            console.log('채팅방 메뉴 버튼은 사이드바 메뉴로 통합되었습니다.');
         }
 
         showBackupModal() {
@@ -860,8 +1233,8 @@
                     btn.style.boxShadow = '0 6px 20px rgba(0, 0, 0, 0.2)';
                 });
                 btn.addEventListener('mouseleave', () => {
-                    btn.style.transform = 'translateY(0)';
-                    btn.style.boxShadow = 'none';
+                    btn.style.transform = 'translateY(0) scale(1)';
+                    btn.style.boxShadow = '0 6px 20px rgba(255, 68, 50, 0.4)';
                 });
             });
 
@@ -923,10 +1296,45 @@
                 const targetPathname = new URL(currentChat.chatUrl, window.location.origin).pathname;
 
                 if (currentPathname === targetPathname) {
+                    // 백업 시작 시간 가져오기 또는 설정
+                    let backupStartTime = localStorage.getItem('wrtn_backup_start_time');
+                    if (!backupStartTime) {
+                        backupStartTime = Date.now().toString();
+                        localStorage.setItem('wrtn_backup_start_time', backupStartTime);
+                    }
+
+                    // 진행률 및 예상 남은 시간 계산
+                    const progressPercent = (currentIndex / chatList.length) * 100;
+                    const elapsedTime = Date.now() - parseInt(backupStartTime, 10);
+                    const estimatedTotalTime = (elapsedTime / (currentIndex + 1)) * chatList.length;
+                    const estimatedTimeRemaining = Math.max(0, estimatedTotalTime - elapsedTime);
+
+                    // 남은 시간 포맷팅
+                    let etaText = '계산 중...';
+                    if (currentIndex > 0) { // 최소 1개 이상 처리 후 계산
+                        if (estimatedTimeRemaining < 60000) { // 1분 미만
+                            etaText = `약 ${Math.ceil(estimatedTimeRemaining / 1000)}초`;
+                        } else if (estimatedTimeRemaining < 3600000) { // 1시간 미만
+                            etaText = `약 ${Math.ceil(estimatedTimeRemaining / 60000)}분`;
+                        } else { // 1시간 이상
+                            const hours = Math.floor(estimatedTimeRemaining / 3600000);
+                            const minutes = Math.ceil((estimatedTimeRemaining % 3600000) / 60000);
+                            etaText = `약 ${hours}시간 ${minutes}분`;
+                        }
+                    }
+
                     // 현재 채팅방에서 메시지 추출
-                    this.showProgress(modal || this.createTemporaryProgressModal(),
+                    const tempModal = modal || this.createTemporaryProgressModal();
+                    this.showProgress(tempModal,
                         `🔄 ${currentChat.characterName} 채팅 백업 중... (${currentIndex + 1}/${chatList.length})`,
-                        (currentIndex / chatList.length) * 100);
+                        progressPercent);
+
+                    // ETA 표시
+                    const etaContainer = tempModal.querySelector('#eta-container');
+                    if (etaContainer) {
+                        etaContainer.textContent = `예상 남은 시간: ${etaText}`;
+                        etaContainer.style.display = 'block';
+                    }
 
                     try {
                         // 페이지 로드를 위한 짧은 대기
@@ -992,6 +1400,7 @@
                             localStorage.removeItem('wrtn_backup_return_url');
                             localStorage.removeItem('wrtn_backup_results');
                             localStorage.removeItem('wrtn_backup_format');
+                            localStorage.removeItem('wrtn_backup_start_time');
 
                             // 시작 페이지로 복귀 (옵션)
                             if (returnUrl) {
@@ -1086,6 +1495,13 @@
                     "></div>
                 </div>
 
+                <div id="eta-container" style="
+                    margin-top: 10px;
+                    font-size: 13px;
+                    color: #61605A;
+                    text-align: center;
+                ">예상 남은 시간: 계산 중...</div>
+
                 <button id="cancel-backup" style="
                     width: 100%;
                     padding: 12px;
@@ -1111,6 +1527,7 @@
                 localStorage.removeItem('wrtn_backup_chat_list');
                 localStorage.removeItem('wrtn_backup_return_url');
                 localStorage.removeItem('wrtn_backup_results');
+                localStorage.removeItem('wrtn_backup_start_time');
                 document.body.removeChild(modalOverlay);
             });
 
@@ -1137,8 +1554,121 @@
 
         async backupChatList(modal) {
             try {
-                this.showProgress(modal, '🔄 채팅 목록 백업 중...');
+                this.showProgress(modal, '🔄 채팅 목록을 불러오는 중... (자동 스크롤 진행 중)');
+
+                // 진행 표시줄 표시
+                const progressBarContainer = modal.querySelector('#progress-bar-container');
+                const progressBar = modal.querySelector('#progress-bar');
+                progressBarContainer.style.display = 'block';
+                progressBar.style.width = '10%'; // 초기 진행률
+
+                // 모바일 환경에서 추가적인 준비 작업 수행
+                if (this.extractor.isMobile) {
+                    this.showProgress(modal, '🔄 모바일 환경에서 채팅 목록 준비 중...', 5);
+
+                    // 1. 기존 모달창을 임시로 숨김 (닫지는 않음)
+                    const originalDisplay = modal.style.display;
+                    modal.style.display = 'none';
+
+                    // 2. 우측 사이드바 닫기 시도 (채팅 페이지에 있을 경우)
+                    const rightCloseButtons = document.querySelectorAll('button[aria-label="닫기"], button.close-btn, button svg[viewBox="0 0 24 24"][width="24"][height="24"]');
+                    for (const btn of rightCloseButtons) {
+                        try {
+                            console.log('우측 사이드바 닫기 버튼 클릭 시도');
+                            btn.click();
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                        } catch (e) {
+                            console.log('버튼 클릭 실패:', e);
+                        }
+                    }
+
+                    // 3. 좌측 햄버거 메뉴 열기 (명시적 시도)
+                    const hamburgerSelectors = [
+                        'button.css-19ekx34',
+                        'button.e1h4uvut1',
+                        'button[display="flex"][height="40px"]',
+                        'button svg[viewBox="0 0 24 24"][width="24"][height="24"]',
+                        'button svg path[d="M21 6.4H3V4.8h18zm0 6.5H3v-1.6h18zM3 19.4h18v-1.6H3z"]'
+                    ];
+
+                    let hamburgerOpened = false;
+                    for (const selector of hamburgerSelectors) {
+                        const btn = document.querySelector(selector);
+                        if (btn) {
+                            const hamburgerButton = btn.tagName === 'BUTTON' ? btn : btn.closest('button');
+                            if (hamburgerButton) {
+                                try {
+                                    console.log('햄버거 메뉴 버튼 클릭 시도');
+                                    hamburgerButton.click();
+                                    await new Promise(resolve => setTimeout(resolve, 1000));
+                                    hamburgerOpened = true;
+                                    break;
+                                } catch (e) {
+                                    console.log('햄버거 버튼 클릭 실패:', e);
+                                }
+                            }
+                        }
+                    }
+
+                    // 4. 채팅 항목 있는지 확인하고 없으면 채팅 탭 클릭 시도
+                    let chatItemsFound = document.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]').length > 0;
+
+                    if (!chatItemsFound && hamburgerOpened) {
+                        // 채팅 탭 버튼 찾기
+                        const chatTabSelectors = [
+                            'button[class*="chat"]',
+                            'a[href="/"]',
+                            'div[class*="tab"]',
+                            'a[class*="tab"]',
+                            'p[class*="css-6pyka7"]'
+                        ];
+
+                        for (const selector of chatTabSelectors) {
+                            const elements = document.querySelectorAll(selector);
+                            for (const el of elements) {
+                                if (el.textContent.includes('대화') || el.textContent.includes('채팅') || el.textContent.includes('chat')) {
+                                    try {
+                                        console.log('채팅 탭 클릭 시도');
+                                        el.click();
+                                        await new Promise(resolve => setTimeout(resolve, 1000));
+                                        chatItemsFound = document.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]').length > 0;
+                                        if (chatItemsFound) break;
+                                    } catch (e) {
+                                        console.log('채팅 탭 클릭 실패:', e);
+                                    }
+                                }
+                            }
+                            if (chatItemsFound) break;
+                        }
+                    }
+
+                    // 5. 모달창 다시 표시
+                    modal.style.display = originalDisplay;
+                    this.showProgress(modal, '🔄 채팅 목록을 불러오는 중... (자동 스크롤 진행 중)', 10);
+                }
+
+                // 스크롤 진행 상황 업데이트를 위한 이벤트 리스너
+                const scrollUpdateListener = (e) => {
+                    if (e.detail && typeof e.detail.percent === 'number') {
+                        // 스크롤 진행률 업데이트 (10~70% 사이로 제한)
+                        const scrollPercent = 10 + (e.detail.percent * 0.6);
+                        progressBar.style.width = `${scrollPercent}%`;
+                        this.showProgress(modal, `🔄 채팅 목록을 불러오는 중... (스크롤 ${Math.round(e.detail.percent)}%)`);
+                    }
+                };
+
+                document.addEventListener('wrtn_scroll_progress', scrollUpdateListener);
+
+                // 채팅 목록 추출 시작
                 const chatList = await this.extractor.extractChatList();
+
+                // 이벤트 리스너 제거
+                document.removeEventListener('wrtn_scroll_progress', scrollUpdateListener);
+
+                // 데이터 처리 진행률 표시
+                progressBar.style.width = '80%';
+                this.showProgress(modal, '🔄 채팅 데이터 처리 중...');
+
                 const format = document.getElementById('export-format').value;
 
                 const data = {
@@ -1150,8 +1680,11 @@
                     chatList: chatList
                 };
 
+                // 완료 표시
+                progressBar.style.width = '100%';
+
                 this.exportData(data, 'wrtn-crack-chat-list', format);
-                this.showProgress(modal, '✅ 백업 완료!');
+                this.showProgress(modal, `✅ 채팅 목록 백업 완료! (총 ${chatList.length}개 채팅방)`);
 
                 setTimeout(() => {
                     document.body.removeChild(modal.closest('[style*="position: fixed"]'));
@@ -1171,6 +1704,91 @@
                 // 초기 상태 표시
                 this.showProgress(modal, '🔄 전체 채팅 백업 준비 중...', 0);
 
+                // 모바일 환경에서 추가적인 준비 작업 수행
+                if (this.extractor.isMobile) {
+                    this.showProgress(modal, '🔄 모바일 환경에서 채팅 목록 준비 중...', 5);
+
+                    // 1. 기존 모달창을 임시로 숨김 (닫지는 않음)
+                    const originalDisplay = modal.style.display;
+                    modal.style.display = 'none';
+
+                    // 2. 우측 사이드바 닫기 시도 (채팅 페이지에 있을 경우)
+                    const rightCloseButtons = document.querySelectorAll('button[aria-label="닫기"], button.close-btn, button svg[viewBox="0 0 24 24"][width="24"][height="24"]');
+                    for (const btn of rightCloseButtons) {
+                        try {
+                            console.log('우측 사이드바 닫기 버튼 클릭 시도');
+                            btn.click();
+                            await new Promise(resolve => setTimeout(resolve, 500));
+                        } catch (e) {
+                            console.log('버튼 클릭 실패:', e);
+                        }
+                    }
+
+                    // 3. 좌측 햄버거 메뉴 열기 (명시적 시도)
+                    const hamburgerSelectors = [
+                        'button.css-19ekx34',
+                        'button.e1h4uvut1',
+                        'button[display="flex"][height="40px"]',
+                        'button svg[viewBox="0 0 24 24"][width="24"][height="24"]',
+                        'button svg path[d="M21 6.4H3V4.8h18zm0 6.5H3v-1.6h18zM3 19.4h18v-1.6H3z"]'
+                    ];
+
+                    let hamburgerOpened = false;
+                    for (const selector of hamburgerSelectors) {
+                        const btn = document.querySelector(selector);
+                        if (btn) {
+                            const hamburgerButton = btn.tagName === 'BUTTON' ? btn : btn.closest('button');
+                            if (hamburgerButton) {
+                                try {
+                                    console.log('햄버거 메뉴 버튼 클릭 시도');
+                                    hamburgerButton.click();
+                                    await new Promise(resolve => setTimeout(resolve, 1000));
+                                    hamburgerOpened = true;
+                                    break;
+                                } catch (e) {
+                                    console.log('햄버거 버튼 클릭 실패:', e);
+                                }
+                            }
+                        }
+                    }
+
+                    // 4. 채팅 항목 있는지 확인하고 없으면 채팅 탭 클릭 시도
+                    let chatItemsFound = document.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]').length > 0;
+
+                    if (!chatItemsFound && hamburgerOpened) {
+                        // 채팅 탭 버튼 찾기
+                        const chatTabSelectors = [
+                            'button[class*="chat"]',
+                            'a[href="/"]',
+                            'div[class*="tab"]',
+                            'a[class*="tab"]',
+                            'p[class*="css-6pyka7"]'
+                        ];
+
+                        for (const selector of chatTabSelectors) {
+                            const elements = document.querySelectorAll(selector);
+                            for (const el of elements) {
+                                if (el.textContent.includes('대화') || el.textContent.includes('채팅') || el.textContent.includes('chat')) {
+                                    try {
+                                        console.log('채팅 탭 클릭 시도');
+                                        el.click();
+                                        await new Promise(resolve => setTimeout(resolve, 1000));
+                                        chatItemsFound = document.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]').length > 0;
+                                        if (chatItemsFound) break;
+                                    } catch (e) {
+                                        console.log('채팅 탭 클릭 실패:', e);
+                                    }
+                                }
+                            }
+                            if (chatItemsFound) break;
+                        }
+                    }
+
+                    // 5. 모달창 다시 표시
+                    modal.style.display = originalDisplay;
+                    this.showProgress(modal, '🔄 채팅 목록 불러오는 중...', 10);
+                }
+
                 // 채팅 목록 가져오기
                 const chatList = await this.extractor.extractChatList();
                 if (!chatList || chatList.length === 0) {
@@ -1181,7 +1799,7 @@
                 this.showProgress(
                     modal,
                     `🔄 전체 채팅 백업 시작... (총 ${chatList.length}개)`,
-                    0
+                    15
                 );
 
                 // 초기 백업 상태 설정
@@ -1190,6 +1808,7 @@
                 localStorage.setItem('wrtn_backup_chat_list', JSON.stringify(chatList));
                 localStorage.setItem('wrtn_backup_return_url', window.location.href);
                 localStorage.setItem('wrtn_backup_results', JSON.stringify({fullChats: []}));
+                localStorage.setItem('wrtn_backup_start_time', Date.now().toString());
 
                 // 첫 번째 채팅방으로 이동하여 백업 시작
                 if (chatList.length > 0) {
@@ -1206,6 +1825,7 @@
                 localStorage.removeItem('wrtn_backup_chat_list');
                 localStorage.removeItem('wrtn_backup_return_url');
                 localStorage.removeItem('wrtn_backup_results');
+                localStorage.removeItem('wrtn_backup_start_time');
             }
         }
 
@@ -1247,7 +1867,10 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <meta name="theme-color" content="#0a0a0a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>${data.characterName || '뤼튼 크랙'} - 채팅 백업</title>
     <style>
         * {
@@ -1415,6 +2038,47 @@
 
         .message-paragraph:last-child {
             margin-bottom: 0;
+        }
+
+        /* 마크다운 메시지 스타일 */
+        .message-markdown {
+            word-break: break-word;
+            line-height: 1.6;
+        }
+
+        .message-markdown .code-block {
+            background: rgba(0, 0, 0, 0.1) !important;
+            border: 1px solid rgba(0, 0, 0, 0.2) !important;
+            border-radius: 8px !important;
+            padding: 12px !important;
+            margin: 8px 0 !important;
+            font-family: 'Courier New', Consolas, Monaco, monospace !important;
+            font-size: 13px !important;
+            line-height: 1.4 !important;
+            overflow-x: auto !important;
+            white-space: pre-wrap !important;
+        }
+
+        .message-markdown .quote-block {
+            border-left: 3px solid rgba(0, 0, 0, 0.3) !important;
+            margin: 8px 0 !important;
+            padding: 8px 12px !important;
+            background: rgba(0, 0, 0, 0.05) !important;
+            font-style: italic !important;
+            border-radius: 0 4px 4px 0 !important;
+        }
+
+        /* 다크 테마 대응 */
+        @media (prefers-color-scheme: dark) {
+            .message-markdown .code-block {
+                background: rgba(255, 255, 255, 0.1) !important;
+                border-color: rgba(255, 255, 255, 0.2) !important;
+            }
+
+            .message-markdown .quote-block {
+                border-left-color: rgba(255, 255, 255, 0.3) !important;
+                background: rgba(255, 255, 255, 0.05) !important;
+            }
         }
 
         /* 날짜 구분선 */
@@ -1959,7 +2623,12 @@
 
                                 contentItem.nodes.forEach(node => {
                                     if (node.type === 'text') {
-                                        if (node.emphasis) {
+                                        if (node.raw) {
+                                            // 원본 텍스트 (마크다운/코드블럭 포함)를 <pre> 태그로 감싸서 포맷 보존
+                                            const rawText = this.escapeHtml(node.content);
+                                            const formattedText = this.formatRawText(rawText);
+                                            html += formattedText;
+                                        } else if (node.emphasis) {
                                             html += `<em>${this.escapeHtml(node.content)}</em>`;
                                         } else {
                                             html += this.escapeHtml(node.content);
@@ -1972,6 +2641,29 @@
                                 });
 
                                 html += `</div>`;
+                            } else if (contentItem.type === 'markdown') {
+                                // 마크다운 콘텐츠 처리
+                                console.log('HTML 생성 - 마크다운 콘텐츠 처리:', contentItem.htmlContent || contentItem.content);
+
+                                if (contentItem.isHtml && contentItem.htmlContent) {
+                                    // HTML 문자열을 파싱하여 DOM으로 변환
+                                    const tempDiv = document.createElement('div');
+                                    tempDiv.innerHTML = contentItem.htmlContent;
+                                    const messageContainer = tempDiv.firstChild;
+
+                                    if (messageContainer) {
+                                        const processedHtml = this.processMarkdownHtml(messageContainer);
+                                        console.log('HTML DOM 처리 결과:', processedHtml);
+                                        html += `<div class="message-markdown">${processedHtml}</div>`;
+                                    }
+                                } else if (contentItem.content) {
+                                    // 기존 텍스트 처리
+                                    const rawText = this.escapeHtml(contentItem.content);
+                                    console.log('이스케이프 후:', rawText);
+                                    const formattedText = this.formatRawText(rawText);
+                                    console.log('포맷팅 후:', formattedText);
+                                    html += `<div class="message-markdown">${formattedText}</div>`;
+                                }
                             } else if (contentItem.type === 'image') {
                                 html += `<img src="${contentItem.url}" alt="${contentItem.alt || '이미지'}" class="message-image">`;
                             }
@@ -2121,7 +2813,12 @@
 
                                         contentItem.nodes.forEach(node => {
                                             if (node.type === 'text') {
-                                                if (node.emphasis) {
+                                                if (node.raw) {
+                                                    // 원본 텍스트 (마크다운/코드블럭 포함)를 <pre> 태그로 감싸서 포맷 보존
+                                                    const rawText = this.escapeHtml(node.content);
+                                                    const formattedText = this.formatRawText(rawText);
+                                                    html += formattedText;
+                                                } else if (node.emphasis) {
                                                     html += `<em>${this.escapeHtml(node.content)}</em>`;
                                                 } else {
                                                     html += this.escapeHtml(node.content);
@@ -2134,6 +2831,29 @@
                                         });
 
                                         html += `</div>`;
+                                    } else if (contentItem.type === 'markdown') {
+                                        // 마크다운 콘텐츠 처리
+                                        console.log('전체 채팅 - HTML 생성 중 마크다운 콘텐츠 처리:', contentItem.htmlContent || contentItem.content);
+
+                                        if (contentItem.isHtml && contentItem.htmlContent) {
+                                            // HTML 문자열을 파싱하여 DOM으로 변환
+                                            const tempDiv = document.createElement('div');
+                                            tempDiv.innerHTML = contentItem.htmlContent;
+                                            const messageContainer = tempDiv.firstChild;
+
+                                            if (messageContainer) {
+                                                const processedHtml = this.processMarkdownHtml(messageContainer);
+                                                console.log('전체 채팅 - HTML DOM 처리 결과:', processedHtml);
+                                                html += `<div class="message-markdown">${processedHtml}</div>`;
+                                            }
+                                        } else if (contentItem.content) {
+                                            // 기존 텍스트 처리
+                                            const rawText = this.escapeHtml(contentItem.content);
+                                            console.log('전체 채팅 - 이스케이프 후:', rawText);
+                                            const formattedText = this.formatRawText(rawText);
+                                            console.log('전체 채팅 - 포맷팅 후:', formattedText);
+                                            html += `<div class="message-markdown">${formattedText}</div>`;
+                                        }
                                     } else if (contentItem.type === 'image') {
                                         html += `<img src="${contentItem.url}" alt="${contentItem.alt || '이미지'}" class="message-image">`;
                                     }
@@ -2295,6 +3015,274 @@
             return div.innerHTML;
         }
 
+        processMarkdownHtml(container) {
+            console.log('processMarkdownHtml 시작');
+            let result = '';
+
+            // 컨테이너의 자식 요소들을 순회
+            container.childNodes.forEach(node => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    // 코드블럭 처리
+                    if (node.tagName === 'PRE' && node.querySelector('code')) {
+                        const codeElement = node.querySelector('code');
+                        const codeContent = codeElement.textContent || codeElement.innerText;
+                        console.log('코드블럭 발견:', codeContent);
+
+                        result += `<div class="code-block" style="
+                            background: rgba(0, 0, 0, 0.1) !important;
+                            border: 1px solid rgba(0, 0, 0, 0.2) !important;
+                            border-radius: 8px !important;
+                            padding: 12px !important;
+                            margin: 8px 0 !important;
+                            font-family: 'Courier New', Consolas, Monaco, monospace !important;
+                            font-size: 13px !important;
+                            line-height: 1.4 !important;
+                            overflow-x: auto !important;
+                            white-space: pre-wrap !important;
+                        "><pre style="margin: 0; white-space: pre-wrap;">${this.escapeHtml(codeContent)}</pre></div>`;
+                    }
+                    // 인용구 처리
+                    else if (node.tagName === 'BLOCKQUOTE') {
+                        const quoteContent = node.textContent || node.innerText;
+                        console.log('인용구 발견:', quoteContent);
+
+                        result += `<div class="quote-block" style="
+                            border-left: 3px solid rgba(0, 0, 0, 0.3) !important;
+                            margin: 8px 0 !important;
+                            padding: 8px 12px !important;
+                            background: rgba(0, 0, 0, 0.05) !important;
+                            font-style: italic !important;
+                            border-radius: 0 4px 4px 0 !important;
+                        ">${this.escapeHtml(quoteContent)}</div>`;
+                    }
+                    // 헤딩 처리
+                    else if (/^H[1-6]$/.test(node.tagName)) {
+                        const level = node.tagName.charAt(1);
+                        const headingContent = node.textContent || node.innerText;
+                        console.log(`헤딩 ${level} 발견:`, headingContent);
+
+                        const size = Math.max(14, 20 - parseInt(level) * 1);
+                        result += `<h${level} style="
+                            font-size: ${size}px !important;
+                            font-weight: bold !important;
+                            margin: 12px 0 8px 0 !important;
+                            color: inherit !important;
+                            line-height: 1.3 !important;
+                        ">${this.escapeHtml(headingContent)}</h${level}>`;
+                    }
+                    // 리스트 처리 (ul)
+                    else if (node.tagName === 'UL') {
+                        console.log('리스트(UL) 발견');
+                        result += '<ul style="padding-left: 20px !important; margin: 8px 0 !important;">';
+
+                        // 모든 LI 자식 요소들 처리
+                        Array.from(node.children).forEach(li => {
+                            if (li.tagName === 'LI') {
+                                result += `<li style="margin: 4px 0 !important; list-style-type: disc !important;">
+                                    ${this.escapeHtml(li.textContent)}
+                                </li>`;
+                            }
+                        });
+
+                        result += '</ul>';
+                    }
+                    // 일반 div 처리
+                    else if (node.tagName === 'DIV' && node.classList.contains('css-l6zbeu')) {
+                        // 일반 텍스트 단락
+                        const paragraphContent = this.processParagraphNode(node);
+                        if (paragraphContent) {
+                            result += `<div class="message-paragraph">${paragraphContent}</div>`;
+                        }
+                    }
+                    // 이미지 처리
+                    else if (node.tagName === 'IMG') {
+                        result += `<img src="${node.src}" alt="${node.alt || '이미지'}" class="message-image">`;
+                    }
+                } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+                    // 텍스트 노드
+                    result += this.escapeHtml(node.textContent);
+                }
+            });
+
+            console.log('processMarkdownHtml 결과:', result);
+            return result;
+        }
+
+        processParagraphNode(node) {
+            let result = '';
+
+            node.childNodes.forEach(child => {
+                if (child.nodeType === Node.TEXT_NODE) {
+                    result += this.escapeHtml(child.textContent);
+                } else if (child.nodeType === Node.ELEMENT_NODE) {
+                    if (child.tagName === 'EM') {
+                        result += `<em>${this.escapeHtml(child.textContent)}</em>`;
+                    } else if (child.tagName === 'IMG') {
+                        result += `<img src="${child.src}" alt="${child.alt || '이미지'}" class="message-image">`;
+                    } else if (child.classList && child.classList.contains('css-obwzop')) {
+                        // 이미지 컨테이너
+                        const img = child.querySelector('img');
+                        if (img) {
+                            result += `<img src="${img.src}" alt="${img.alt || '이미지'}" class="message-image">`;
+                        }
+                    } else {
+                        result += this.escapeHtml(child.textContent || '');
+                    }
+                }
+            });
+
+            return result;
+        }
+
+        formatRawText(text) {
+            console.log('formatRawText 시작 - 입력 텍스트:', text);
+            // 코드블럭을 HTML로 변환
+            let formatted = text;
+
+            // ``` 코드블럭 처리
+            formatted = formatted.replace(/```([\s\S]*?)```/g, (match, content) => {
+                console.log('코드블럭 감지됨:', match);
+                console.log('코드블럭 내용:', content);
+                return `<div class="code-block" style="
+                    background: rgba(0, 0, 0, 0.1);
+                    border: 1px solid rgba(0, 0, 0, 0.2);
+                    border-radius: 8px;
+                    padding: 12px;
+                    margin: 8px 0;
+                    font-family: 'Courier New', Consolas, Monaco, monospace;
+                    font-size: 13px;
+                    line-height: 1.4;
+                    overflow-x: auto;
+                    white-space: pre-wrap;
+                    color: inherit;
+                "><pre style="margin: 0; white-space: pre-wrap;">${content.trim()}</pre></div>`;
+            });
+
+            // > 인용구 처리
+            formatted = formatted.replace(/^>\s*(.+)$/gm, (match, content) => {
+                console.log('인용구 감지됨:', match);
+                return `<div class="quote-block" style="
+                    border-left: 3px solid rgba(0, 0, 0, 0.3);
+                    margin: 8px 0;
+                    padding: 8px 12px;
+                    background: rgba(0, 0, 0, 0.05);
+                    font-style: italic;
+                    border-radius: 0 4px 4px 0;
+                ">${content}</div>`;
+            });
+
+            // # 헤딩 처리
+            formatted = formatted.replace(/^#{1,6}\s*(.+)$/gm, (match, content) => {
+                const level = match.match(/^#+/)[0].length;
+                const size = Math.max(14, 20 - level * 1);
+                return `<h${level} style="
+                    font-size: ${size}px;
+                    font-weight: bold;
+                    margin: 12px 0 8px 0;
+                    color: inherit;
+                    line-height: 1.3;
+                ">${content}</h${level}>`;
+            });
+
+            // 리스트 처리
+            // 리스트 블록 추출
+            const listBlocks = [];
+            let inList = false;
+            let currentList = [];
+            const lines = formatted.split('\n');
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                const isListItem = /^-\s+(.*)$|^\*\s+(.*)$|^\d+\.\s+(.*)$/.test(line);
+
+                if (isListItem) {
+                    if (!inList) {
+                        inList = true;
+                        currentList = [];
+                    }
+                    currentList.push(line);
+                } else if (inList && line === '') {
+                    // 빈 줄이면 리스트 종료
+                    if (currentList.length > 0) {
+                        listBlocks.push(currentList.join('\n'));
+                        currentList = [];
+                    }
+                    inList = false;
+                } else if (inList) {
+                    // 리스트가 아닌 다른 라인이 나오면 리스트 종료
+                    if (currentList.length > 0) {
+                        listBlocks.push(currentList.join('\n'));
+                        currentList = [];
+                    }
+                    inList = false;
+                }
+            }
+
+            // 마지막 리스트가 있다면 추가
+            if (inList && currentList.length > 0) {
+                listBlocks.push(currentList.join('\n'));
+            }
+
+            // 리스트 블록을 HTML로 변환
+            listBlocks.forEach(block => {
+                const items = block.split('\n');
+                let listHtml = '<ul style="padding-left: 20px; margin: 8px 0;">';
+
+                items.forEach(item => {
+                    const match = item.match(/^(?:-\s+|\*\s+|\d+\.\s+)(.*)$/);
+                    if (match) {
+                        const content = match[1];
+                        listHtml += `<li style="margin: 4px 0; list-style-type: disc;">${content}</li>`;
+                    }
+                });
+
+                listHtml += '</ul>';
+                formatted = formatted.replace(block, listHtml);
+            });
+
+            // ** 굵게 처리
+            formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+            // * 기울임 처리 (** 처리 후)
+            formatted = formatted.replace(/\*((?!\*)[^*]+)\*/g, '<em>$1</em>');
+
+            // 줄바꿈을 <br>로 변환 (단, 이미 처리된 블록 요소는 제외)
+            const formattedLines = formatted.split('\n');
+            let result = '';
+            let inBlock = false;
+
+            for (let i = 0; i < formattedLines.length; i++) {
+                const line = formattedLines[i];
+
+                if (line.includes('<div class="code-block"') ||
+                    line.includes('<div class="quote-block"') ||
+                    line.includes('<h') ||
+                    line.includes('<ul') ||
+                    line.includes('<li')) {
+                    inBlock = true;
+                }
+
+                if (line.includes('</div>') ||
+                    line.includes('</h') ||
+                    line.includes('</ul>')) {
+                    inBlock = false;
+                }
+
+                if (!inBlock && line.trim() === '' && i < formattedLines.length - 1) {
+                    result += '<br>';
+                } else {
+                    result += line;
+                }
+
+                if (i < formattedLines.length - 1) {
+                    result += '\n';
+                }
+            }
+
+            console.log('formatRawText 결과:', result);
+            return result;
+        }
+
         generateTXT(data) {
             let txt = '💾 뤼튼 크랙 채팅 백업\n';
             txt += '========================\n';
@@ -2331,7 +3319,12 @@
                                 let paragraphText = '';
                                 contentItem.nodes.forEach(node => {
                                     if (node.type === 'text') {
-                                        paragraphText += node.content;
+                                        if (node.raw) {
+                                            // 원본 마크다운/코드블럭 텍스트를 그대로 사용
+                                            paragraphText += node.content;
+                                        } else {
+                                            paragraphText += node.content;
+                                        }
                                     } else if (node.type === 'linebreak') {
                                         paragraphText += '\n';
                                     } else if (node.type === 'image') {
@@ -2339,6 +3332,23 @@
                                     }
                                 });
                                 txt += paragraphText + '\n';
+                            } else if (contentItem.type === 'markdown') {
+                                // 마크다운 콘텐츠 처리
+                                if (contentItem.isHtml && contentItem.htmlContent) {
+                                    // HTML 문자열을 파싱하여 DOM으로 변환
+                                    const tempDiv = document.createElement('div');
+                                    tempDiv.innerHTML = contentItem.htmlContent;
+                                    const messageContainer = tempDiv.firstChild;
+
+                                    if (messageContainer) {
+                                        // HTML DOM을 원본 마크다운 형태로 변환
+                                        txt += this.convertHtmlToMarkdown(messageContainer) + '\n';
+                                    }
+                                } else if (contentItem.content) {
+                                    txt += `${contentItem.content}\n`;
+                                } else {
+                                    txt += `[마크다운]\n`;
+                                }
                             } else if (contentItem.type === 'image') {
                                 txt += `[이미지: ${contentItem.alt}] (${contentItem.url})\n`;
                             }
@@ -2378,6 +3388,9 @@
                                             }
                                         });
                                         txt += paragraphText + '\n';
+                                    } else if (contentItem.type === 'markdown') {
+                                        // 마크다운 콘텐츠 처리
+                                        txt += `${contentItem.content}\n`;
                                     } else if (contentItem.type === 'image') {
                                         txt += `[이미지: ${contentItem.alt}] (${contentItem.url})\n`;
                                     }
@@ -2394,6 +3407,94 @@
             }
 
             return txt;
+        }
+
+        // HTML DOM을 마크다운 텍스트로 변환
+        convertHtmlToMarkdown(container) {
+            let result = '';
+
+            // 컨테이너의 자식 요소들을 순회
+            container.childNodes.forEach(node => {
+                if (node.nodeType === Node.ELEMENT_NODE) {
+                    // 코드블럭 처리
+                    if (node.tagName === 'PRE' && node.querySelector('code')) {
+                        const codeElement = node.querySelector('code');
+                        const codeContent = codeElement.textContent || codeElement.innerText;
+                        // 언어 정보 추출 시도
+                        const langClass = codeElement.className.match(/language-(\w+)/);
+                        const lang = langClass ? langClass[1] : '';
+                        result += '```' + lang + '\n' + codeContent + '\n```\n';
+                    }
+                    // 인용구 처리
+                    else if (node.tagName === 'BLOCKQUOTE') {
+                        const quoteContent = node.textContent || node.innerText;
+                        // 각 줄 앞에 > 추가
+                        const lines = quoteContent.split('\n');
+                        lines.forEach(line => {
+                            if (line.trim()) {
+                                result += '> ' + line + '\n';
+                            }
+                        });
+                    }
+                    // 헤딩 처리
+                    else if (/^H[1-6]$/.test(node.tagName)) {
+                        const level = parseInt(node.tagName.charAt(1));
+                        const headingContent = node.textContent || node.innerText;
+                        result += '#'.repeat(level) + ' ' + headingContent + '\n';
+                    }
+                    // 리스트 처리
+                    else if (node.tagName === 'UL') {
+                        // 리스트 항목들 처리
+                        Array.from(node.children).forEach(li => {
+                            if (li.tagName === 'LI') {
+                                const liContent = li.textContent || li.innerText;
+                                result += '- ' + liContent + '\n';
+                            }
+                        });
+                        result += '\n';
+                    }
+                    // 개별 리스트 항목 처리 (중첩 리스트인 경우)
+                    else if (node.tagName === 'LI') {
+                        const liContent = node.textContent || node.innerText;
+                        result += '- ' + liContent + '\n';
+                    }
+                    // 일반 텍스트 단락
+                    else if (node.tagName === 'DIV' || node.tagName === 'P') {
+                        const textContent = node.textContent || node.innerText;
+                        if (textContent.trim()) {
+                            result += textContent + '\n';
+                        }
+                    }
+                    // 이미지 처리
+                    else if (node.tagName === 'IMG') {
+                        result += `![${node.alt || '이미지'}](${node.src})\n`;
+                    }
+                    // 강조 처리
+                    else if (node.tagName === 'EM' || node.tagName === 'I') {
+                        result += '*' + node.textContent + '*';
+                    }
+                    // 굵게 처리
+                    else if (node.tagName === 'STRONG' || node.tagName === 'B') {
+                        result += '**' + node.textContent + '**';
+                    }
+                    // 줄바꿈
+                    else if (node.tagName === 'BR') {
+                        result += '\n';
+                    }
+                    // 기타 요소는 텍스트만 추출
+                    else {
+                        const textContent = node.textContent || node.innerText;
+                        if (textContent.trim()) {
+                            result += textContent;
+                        }
+                    }
+                } else if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+                    // 텍스트 노드
+                    result += node.textContent;
+                }
+            });
+
+            return result.trim();
         }
     }
 
