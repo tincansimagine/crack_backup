@@ -20,10 +20,10 @@
 
 ### 2단계: 스크립트 설치
 
-[![Install Script](https://img.shields.io/badge/🚀%20Install-뤼튼_크랙_백업-red?style=for-the-badge)](https://github.com/tincansimagine/crack_backup/raw/refs/heads/main/%EB%A4%BC%ED%8A%BC%20%ED%81%AC%EB%9E%99%20%EC%B1%84%ED%8C%85%20%EB%B0%B1%EC%97%85-1.1.0.user.js)
+[![Install Script](https://img.shields.io/badge/🚀%20Install-뤼튼_크랙_백업-red?style=for-the-badge)](https://github.com/tincansimagine/crack_backup/raw/refs/heads/main/%EB%A4%BC%ED%8A%BC%20%ED%81%AC%EB%9E%99%20%EC%B1%84%ED%8C%85%20%EB%B0%B1%EC%97%85-1.1.1.user.js)
 
 **직접 설치 링크:**
-[https://github.com/tincansimagine/crack_backup/raw/refs/heads/main/뤼튼%20크랙%20채팅%20백업-1.1.0.user.js]
+[https://github.com/tincansimagine/crack_backup/raw/refs/heads/main/뤼튼%20크랙%20채팅%20백업-1.1.1.user.js]
 
 ## 📖 사용법
 
