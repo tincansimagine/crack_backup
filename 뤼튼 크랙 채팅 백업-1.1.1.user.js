@@ -179,7 +179,7 @@
                     // 스크롤 진행
                     if (this.isMobile) {
                         // 모바일에서는 점진적으로 스크롤
-                        const scrollStep = 300; // 한 번에 300px씩 스크롤
+                        const scrollStep = 1000; // 한 번에 1000px씩 스크롤
                         const currentScrollTop = scrollContainer.scrollTop;
                         scrollContainer.scrollTop += scrollStep;
                         
