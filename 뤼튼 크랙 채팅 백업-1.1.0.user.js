@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         뤼튼 크랙 채팅 백업
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1
+// @version      1.1.1
 // @description  뤼튼 크랙(Wrtn Crack) 웹사이트에서 채팅 내역을 백업하는 스크립트 (모바일 지원 강화, HTML 마크다운/목록 지원)
 // @author       케츠
 // @match        https://crack.wrtn.ai/*
