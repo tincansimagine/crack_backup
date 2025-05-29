@@ -6,6 +6,9 @@
 // @author       케츠
 // @match        https://crack.wrtn.ai/*
 // @icon         https://crack.wrtn.ai/favicon.ico
+// @updateURL    https://github.com/tincansimagine/crack_backup/raw/main/%EB%A4%BC%ED%8A%BC%20%ED%81%AC%EB%9E%99%20%EC%B1%84%ED%8C%85%20%EB%B0%B1%EC%97%85-1.1.1.user.js
+// @downloadURL  https://github.com/tincansimagine/crack_backup/raw/main/%EB%A4%BC%ED%8A%BC%20%ED%81%AC%EB%9E%99%20%EC%B1%84%ED%8C%85%20%EB%B0%B1%EC%97%85-1.1.1.user.js
+// @supportURL   https://github.com/tincansimagine/crack_backup/issues
 // @grant        none
 // @license      MIT
 // ==/UserScript==
@@ -46,9 +49,9 @@
             if (!dateString) return '날짜 없음';
             const now = new Date();
             const date = new Date(dateString);
-
+            
             if (isNaN(date.getTime())) return dateString;
-
+            
             return date.toLocaleString('ko-KR', {
                 year: 'numeric',
                 month: '2-digit',
@@ -91,12 +94,12 @@
             try {
                 console.log('채팅 목록 추출 시작...');
                 console.log('모바일 환경 감지:', this.isMobile);
-
+                
                 // 모바일인 경우 햄버거 메뉴 자동으로 열기
                 if (this.isMobile) {
                     await this.openMobileMenu();
                 }
-
+                
                 // 실제 사이드바 구조에 맞는 선택자들
                 const sidebarSelectors = [
                     'aside',
@@ -118,23 +121,23 @@
 
                 // 스크롤 가능한 컨테이너 찾기
                 let scrollContainer = this.chatScrollContainer; // openMobileMenu에서 저장한 컨테이너 활용
-
+                
                 // 아직 찾지 못했다면 다시 시도
                 if (!scrollContainer) {
-                    scrollContainer = chatListContainer.querySelector('[class*="css-kvsjdq"]') ||
+                    scrollContainer = chatListContainer.querySelector('[class*="css-kvsjdq"]') || 
                                      chatListContainer.querySelector('[style*="overflow-y"]') ||
                                      chatListContainer.querySelector('[class*="scroll"]') ||
                                      chatListContainer;
                 }
 
                 console.log('스크롤 컨테이너 찾음:', scrollContainer);
-
+                
                 // 채팅 항목 확인 (최소 1개 이상 항목이 있는지)
                 const initialChatItems = scrollContainer.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
                 if (initialChatItems.length === 0) {
                     // 컨테이너에 채팅 항목이 없으면 부모 요소나 다른 컨테이너 찾기 시도
                     console.log('선택된 컨테이너에 채팅 항목이 없습니다. 다른 컨테이너 찾기 시도...');
-
+                    
                     // 다른 컨테이너 후보들 확인
                     const containerCandidates = [
                         document.querySelector('div[class*="css-kvsjdq"]'),
@@ -142,7 +145,7 @@
                         document.querySelector('div[class*="scroll"]'),
                         document.querySelectorAll('a[href*="/u/"][href*="/c/"]')[0]?.closest('div[class*="flex"]')
                     ].filter(Boolean);
-
+                    
                     for (const candidate of containerCandidates) {
                         const items = candidate.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
                         if (items.length > 0) {
@@ -152,7 +155,7 @@
                         }
                     }
                 }
-
+                
                 // 자동 스크롤로 모든 채팅방 로드
                 let previousHeight = 0;
                 let currentHeight = scrollContainer.scrollHeight;
@@ -160,62 +163,62 @@
                 let noChangeCount = 0;
                 const maxScrollAttempts = this.isMobile ? 100 : 50; // 모바일에서는 더 많은 스크롤 시도
                 const waitTime = this.isMobile ? 800 : 500; // 모바일에서는 대기 시간 증가
-
+                
                 console.log('채팅방 목록 자동 로드 시작...');
-
+                
                 // 이전 채팅방 수 기록
                 let previousChatCount = 0;
-
+                
                 while (scrollAttempts < maxScrollAttempts) {
                     // 현재 채팅방 수 확인
                     const currentChatItems = scrollContainer.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
                     const currentChatCount = currentChatItems.length;
-
+                    
                     console.log(`현재 채팅방 수: ${currentChatCount}, 이전 채팅방 수: ${previousChatCount}`);
-
+                    
                     // 스크롤 진행
                     if (this.isMobile) {
                         // 모바일에서는 점진적으로 스크롤
                         const scrollStep = 300; // 한 번에 300px씩 스크롤
                         const currentScrollTop = scrollContainer.scrollTop;
                         scrollContainer.scrollTop += scrollStep;
-
+                        
                         console.log(`모바일 스크롤 단계적 진행: ${currentScrollTop} → ${scrollContainer.scrollTop}`);
                     } else {
                         // PC에서는 한 번에 맨 아래로 스크롤
                         scrollContainer.scrollTop = scrollContainer.scrollHeight;
                     }
-
+                    
                     // 스크롤 진행 상황 이벤트 발생
                     const scrollPercent = Math.min(100, (scrollAttempts / maxScrollAttempts) * 100);
-                    document.dispatchEvent(new CustomEvent('wrtn_scroll_progress', {
-                        detail: { percent: scrollPercent, attempt: scrollAttempts, max: maxScrollAttempts }
+                    document.dispatchEvent(new CustomEvent('wrtn_scroll_progress', { 
+                        detail: { percent: scrollPercent, attempt: scrollAttempts, max: maxScrollAttempts } 
                     }));
-
+                    
                     // 새로운 콘텐츠 로드 대기
                     await new Promise(resolve => setTimeout(resolve, waitTime));
-
+                    
                     // 스크롤 후 변화 확인
                     previousHeight = currentHeight;
                     currentHeight = scrollContainer.scrollHeight;
-
+                    
                     // 모바일에서 추가 대기 (API 응답 대기)
                     if (this.isMobile) {
                         await new Promise(resolve => setTimeout(resolve, 200));
                     }
-
+                    
                     // 스크롤 높이 변화 없고, 채팅방 수도 동일하면 카운트 증가
                     if (previousHeight === currentHeight && previousChatCount === currentChatCount) {
                         noChangeCount++;
                         console.log(`변화 없음 카운트: ${noChangeCount}/5`);
-
+                        
                         // 5번 연속으로 변화가 없으면 스크롤 종료
                         if (noChangeCount >= 5) {
                             // 한 번 더 시도 (모바일에서 가끔 지연 로딩됨)
                             if (this.isMobile) {
                                 scrollContainer.scrollTop = scrollContainer.scrollHeight;
                                 await new Promise(resolve => setTimeout(resolve, 1000));
-
+                                
                                 // 마지막 확인
                                 const finalChatItems = scrollContainer.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
                                 if (finalChatItems.length > currentChatCount) {
@@ -223,7 +226,7 @@
                                     continue; // 채팅방이 증가했으면 계속 스크롤
                                 }
                             }
-
+                            
                             console.log('5번 연속으로 변화가 없어 스크롤 종료');
                             break;
                         }
@@ -231,18 +234,18 @@
                         // 변화가 있으면 카운트 리셋
                         noChangeCount = 0;
                     }
-
+                    
                     // 채팅방 수 업데이트
                     previousChatCount = currentChatCount;
-
+                    
                     scrollAttempts++;
                     console.log(`스크롤 시도 ${scrollAttempts}: 이전 높이=${previousHeight}, 현재 높이=${currentHeight}`);
-
+                    
                     // 모바일에서 스크롤이 맨 아래에 도달하면 상태 확인
                     if (this.isMobile && scrollContainer.scrollTop + scrollContainer.clientHeight >= scrollContainer.scrollHeight - 10) {
                         console.log('모바일 스크롤이 맨 아래에 도달함, 추가 로딩 대기...');
                         await new Promise(resolve => setTimeout(resolve, 1000));
-
+                        
                         // 스크롤을 약간 위로 올렸다 다시 내리기 (추가 로딩 트리거)
                         scrollContainer.scrollTop -= 50;
                         await new Promise(resolve => setTimeout(resolve, 300));
@@ -250,12 +253,12 @@
                         await new Promise(resolve => setTimeout(resolve, 1000));
                     }
                 }
-
+                
                 console.log(`자동 스크롤 완료. 총 ${scrollAttempts}회 스크롤`);
-
+                
                 // 스크롤을 맨 위로 되돌리기 (선택사항)
                 scrollContainer.scrollTop = 0;
-
+                
                 // 약간의 대기 시간 후 채팅 항목 찾기
                 await new Promise(resolve => setTimeout(resolve, 300));
 
@@ -285,7 +288,7 @@
                     const href = item.getAttribute('href') || item.querySelector('a')?.getAttribute('href');
                     const chatId = href ? href.split('/c/')[1] || `item_${index}` : `unknown_${index}`;
                     const unitId = href ? href.split('/u/')[1]?.split('/c/')[0] || 'unknown' : 'unknown';
-
+                    
                     // 캐릭터 이름 찾기
                     const nameSelectors = [
                         '.chat-list-item-character-name',
@@ -294,7 +297,7 @@
                         'h3', 'h4', 'h5',
                         '[class*="title"]'
                     ];
-
+                    
                     let characterName = '알 수 없는 캐릭터';
                     for (const selector of nameSelectors) {
                         const nameEl = item.querySelector(selector);
@@ -303,7 +306,7 @@
                             break;
                         }
                     }
-
+                    
                     // 마지막 메시지 찾기
                     const messageSelectors = [
                         '.chat-list-item-topic',
@@ -312,7 +315,7 @@
                         '[class*="preview"]',
                         'p'
                     ];
-
+                    
                     let lastMessage = '';
                     for (const selector of messageSelectors) {
                         const msgEl = item.querySelector(selector);
@@ -321,7 +324,7 @@
                             break;
                         }
                     }
-
+                    
                     // 날짜 찾기
                     const dateSelectors = [
                         '.chat-update-date-label',
@@ -330,7 +333,7 @@
                         'time',
                         'span'
                     ];
-
+                    
                     let lastUpdated = '';
                     for (const selector of dateSelectors) {
                         const dateEl = item.querySelector(selector);
@@ -342,7 +345,7 @@
                             }
                         }
                     }
-
+                    
                     // 캐릭터 아바타 이미지
                     const avatarEl = item.querySelector('img');
                     const avatarUrl = avatarEl ? avatarEl.src : '';
@@ -375,12 +378,12 @@
         // 모바일 환경에서 햄버거 메뉴 열기
         async openMobileMenu() {
             console.log('모바일 햄버거 메뉴 열기 시도...');
-
+            
             // 먼저 채팅 목록이 이미 표시되어 있는지 확인 (우측 사이드바에 있을 수 있음)
             const chatItems = document.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
             if (chatItems.length > 0) {
                 console.log(`채팅 목록이 이미 표시되어 있습니다. ${chatItems.length}개 항목 발견.`);
-
+                
                 // 스크롤 컨테이너 찾기 시도
                 const scrollContainers = [
                     'div[class*="css-kvsjdq"]',
@@ -389,7 +392,7 @@
                     'div[class*="flex"]',
                     'aside div[display="flex"][width="100%"][height="100%"]'
                 ];
-
+                
                 for (const selector of scrollContainers) {
                     const container = document.querySelector(selector);
                     if (container && container.contains(chatItems[0])) {
@@ -399,20 +402,20 @@
                         return true;
                     }
                 }
-
+                
                 // 명확한 컨테이너를 찾지 못했지만 채팅 목록은 있음
                 return true;
             }
-
+            
             // 햄버거 메뉴 버튼 찾기 (다양한 선택자 시도)
             const hamburgerSelectors = [
-                'button.css-19ekx34',
-                'button.e1h4uvut1',
+                'button.css-19ekx34', 
+                'button.e1h4uvut1', 
                 'button[display="flex"][height="40px"]',
                 'button svg[viewBox="0 0 24 24"][width="24"][height="24"]',
                 'button svg path[d="M21 6.4H3V4.8h18zm0 6.5H3v-1.6h18zM3 19.4h18v-1.6H3z"]'
             ];
-
+            
             let hamburgerButton = null;
             for (const selector of hamburgerSelectors) {
                 const btn = document.querySelector(selector);
@@ -424,22 +427,22 @@
                     }
                 }
             }
-
+            
             if (!hamburgerButton) {
                 console.warn('햄버거 메뉴 버튼을 찾을 수 없습니다. 대화 목록이 이미 표시되어 있는지 확인합니다.');
                 return false;
             }
-
+            
             // 사이드바 열려있는지 확인
             // 사이드바 선택자들
             const sidebarSelectors = [
-                'aside',
-                '[class*="sidebar"]',
+                'aside', 
+                '[class*="sidebar"]', 
                 '[class*="side"]',
                 '.css-kvsjdq', // 채팅 목록 컨테이너
                 'div[class*="css-"] > a[href*="/u/"][href*="/c/"]' // 채팅 항목이 있는 컨테이너
             ];
-
+            
             // 우측 사이드바와 좌측 사이드바 모두 확인
             const sidebarElements = [];
             for (const selector of sidebarSelectors) {
@@ -451,13 +454,13 @@
                     }
                 });
             }
-
+            
             // 사이드바 내에서 채팅 목록 확인
             for (const sidebar of sidebarElements) {
                 const chatItemsInSidebar = sidebar.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
                 if (chatItemsInSidebar.length > 0) {
                     console.log(`사이드바에서 ${chatItemsInSidebar.length}개 채팅 항목 발견`);
-
+                    
                     // 스크롤 컨테이너 찾기
                     const scrollContainers = [
                         'div[class*="css-kvsjdq"]',
@@ -465,7 +468,7 @@
                         'div[style*="overflow"]',
                         'div[display="flex"][width="100%"][height="100%"]'
                     ];
-
+                    
                     for (const selector of scrollContainers) {
                         const container = sidebar.querySelector(selector);
                         if (container && container.contains(chatItemsInSidebar[0])) {
@@ -474,33 +477,33 @@
                             break;
                         }
                     }
-
+                    
                     return true;
                 }
             }
-
+            
             // 아직 채팅 목록이 표시되지 않았으면 햄버거 버튼 클릭
             console.log('햄버거 메뉴 버튼 클릭...');
             hamburgerButton.click();
-
+            
             // 사이드바가 나타날 때까지 대기
             let attempts = 0;
             const maxAttempts = 10;
-
+            
             while (attempts < maxAttempts) {
                 await new Promise(resolve => setTimeout(resolve, 500));
-
+                
                 // 사이드바 확인
                 for (const selector of sidebarSelectors) {
                     const element = document.querySelector(selector);
                     if (element && window.getComputedStyle(element).display !== 'none') {
                         console.log(`사이드바가 나타남: ${selector}`);
-
+                        
                         // 채팅 항목 확인
                         const chatItems = element.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
                         if (chatItems.length > 0) {
                             console.log(`사이드바에서 ${chatItems.length}개 채팅 항목 발견`);
-
+                            
                             // 스크롤 컨테이너 찾기
                             const scrollContainers = [
                                 'div[class*="css-kvsjdq"]',
@@ -508,7 +511,7 @@
                                 'div[style*="overflow"]',
                                 'div[display="flex"][width="100%"][height="100%"]'
                             ];
-
+                            
                             for (const scrollSelector of scrollContainers) {
                                 const container = element.querySelector(scrollSelector);
                                 if (container && container.contains(chatItems[0])) {
@@ -517,12 +520,12 @@
                                     break;
                                 }
                             }
-
+                            
                             // 추가 로딩 시간 대기
                             await new Promise(resolve => setTimeout(resolve, 800));
                             return true;
                         }
-
+                        
                         // 채팅 탭 버튼 클릭 필요할 수 있음
                         const chatTabSelectors = [
                             'button[class*="chat"]',
@@ -531,7 +534,7 @@
                             'a[class*="tab"]',
                             'p[class*="css-6pyka7"]'
                         ];
-
+                        
                         for (const tabSelector of chatTabSelectors) {
                             const buttons = element.querySelectorAll(tabSelector);
                             for (const btn of buttons) {
@@ -539,7 +542,7 @@
                                     console.log('채팅 탭 버튼 클릭 시도...');
                                     btn.click();
                                     await new Promise(resolve => setTimeout(resolve, 1000));
-
+                                    
                                     // 클릭 후 채팅 항목 확인
                                     const items = element.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]');
                                     if (items.length > 0) {
@@ -551,20 +554,20 @@
                         }
                     }
                 }
-
+                
                 attempts++;
             }
-
+            
             console.warn('사이드바를 열거나 채팅 항목을 찾지 못했습니다.');
             return false;
         }
-
+        
         // 모바일 환경에서 햄버거 메뉴 닫기
         closeMobileMenu() {
             // 백업 작업이 끝난 후 메뉴를 닫을지 여부는 선택사항
             // 닫고 싶다면 다시 햄버거 버튼 찾아서 클릭
             const hamburgerButton = document.querySelector('button.css-19ekx34, button.e1h4uvut1, button[display="flex"][height="40px"]');
-
+            
             if (hamburgerButton) {
                 console.log('햄버거 메뉴 닫기...');
                 hamburgerButton.click();
@@ -597,12 +600,12 @@
                     let content = []; // 메시지 내용을 배열로 저장 (텍스트와 이미지 모두 포함)
                     let timestamp = ''; // 타임스탬프는 현재 HTML 구조에서 명확하지 않아 비워둠
                     let avatar = '';
-
+                    
                     console.log(`메시지 아이템 ${index + 1} 처리 중...`);
 
                     // 캐릭터 메시지인지 확인 (캐릭터 이름 요소 존재 여부로 판단)
                     const characterNameElement = item.querySelector('span[class*="css-h6nvx3"]'); // 캐릭터 이름 선택자
-
+                    
                     if (characterNameElement && characterNameElement.textContent.trim()) {
                         // 캐릭터 메시지
                         author = characterNameElement.textContent.trim();
@@ -618,18 +621,18 @@
                             // 원본 HTML과 텍스트를 모두 확인하여 가장 완전한 내용 추출
                             const htmlContent = messageContainer.innerHTML;
                             const textContent = messageContainer.textContent || messageContainer.innerText;
-
+                            
                             console.log('캐릭터 메시지 원본 텍스트:', textContent);
                             console.log('캐릭터 메시지 HTML:', htmlContent);
-
+                            
                             // HTML에서 마크다운 요소들을 확인
                             const hasCodeBlock = messageContainer.querySelector('pre code') !== null;
                             const hasBlockquote = messageContainer.querySelector('blockquote') !== null;
                             const hasHeading = messageContainer.querySelector('h1, h2, h3, h4, h5, h6') !== null;
                             const hasMarkdownElements = hasCodeBlock || hasBlockquote || hasHeading;
-
+                            
                             console.log('코드블럭 감지:', hasCodeBlock, '인용구 감지:', hasBlockquote, '헤딩 감지:', hasHeading);
-
+                            
                             if (hasMarkdownElements) {
                                 // 마크다운 요소가 있는 경우 HTML을 파싱하여 원본 마크다운 형태로 복원
                                 console.log('마크다운 요소 감지됨 - HTML 파싱하여 처리');
@@ -641,12 +644,12 @@
                             } else {
                                 // 일반적인 메시지는 기존 방식으로 처리
                                 const childElements = messageContainer.children;
-
+                                
                                 for (let childElement of childElements) {
                                     if (childElement.classList.contains('css-l6zbeu')) {
                                         // 텍스트 콘텐츠
                                         let paragraphNodes = [];
-
+                                        
                                         childElement.childNodes.forEach(node => {
                                             if (node.nodeType === Node.TEXT_NODE) {
                                                 const text = node.textContent;
@@ -666,7 +669,7 @@
                                                 }
                                             }
                                         });
-
+                                        
                                         if (paragraphNodes.length > 0) {
                                             content.push({
                                                 type: 'paragraph',
@@ -691,25 +694,25 @@
                     } else {
                         // 사용자 메시지로 간주 (캐릭터 이름 요소가 없는 경우)
                         console.log('사용자 메시지 감지됨:', index);
-
+                        
                         // 사용자 메시지 내용 추출 - 여러 선택자 시도
                         const userMessageContainer = item.querySelector('.css-jswf15');
                         if (userMessageContainer) {
                             // 원본 HTML과 텍스트를 모두 확인하여 가장 완전한 내용 추출
                             const htmlContent = userMessageContainer.innerHTML;
                             const textContent = userMessageContainer.textContent || userMessageContainer.innerText;
-
+                            
                             console.log('사용자 메시지 원본 텍스트:', textContent);
                             console.log('사용자 메시지 HTML:', htmlContent);
-
+                            
                             // HTML에서 마크다운 요소들을 확인
                             const hasCodeBlock = userMessageContainer.querySelector('pre code') !== null;
                             const hasBlockquote = userMessageContainer.querySelector('blockquote') !== null;
                             const hasHeading = userMessageContainer.querySelector('h1, h2, h3, h4, h5, h6') !== null;
                             const hasMarkdownElements = hasCodeBlock || hasBlockquote || hasHeading;
-
+                            
                             console.log('사용자 - 코드블럭 감지:', hasCodeBlock, '인용구 감지:', hasBlockquote, '헤딩 감지:', hasHeading);
-
+                            
                             if (hasMarkdownElements) {
                                 // 마크다운 요소가 있는 경우 HTML을 파싱하여 처리
                                 console.log('사용자 메시지에서 마크다운 요소 감지됨 - HTML 파싱하여 처리');
@@ -721,12 +724,12 @@
                             } else {
                                 // 일반적인 메시지는 기존 방식으로 처리
                                 const childElements = userMessageContainer.children;
-
+                                
                                 for (let childElement of childElements) {
                                     if (childElement.classList.contains('css-l8rc0l')) {
                                         // 사용자 텍스트 콘텐츠
                                         let paragraphNodes = [];
-
+                                        
                                         childElement.childNodes.forEach(node => {
                                             if (node.nodeType === Node.TEXT_NODE) {
                                                 const text = node.textContent;
@@ -749,7 +752,7 @@
                                                     if (nodeText.trim()) {
                                                         paragraphNodes.push({type: 'text', content: nodeText});
                                                     }
-
+                                                    
                                                     // 내부에 이미지가 있는지 확인
                                                     const nestedImages = node.querySelectorAll('img');
                                                     if (nestedImages.length > 0) {
@@ -764,7 +767,7 @@
                                                 }
                                             }
                                         });
-
+                                        
                                         if (paragraphNodes.length > 0) {
                                             content.push({
                                                 type: 'paragraph',
@@ -785,7 +788,7 @@
                                 }
                             }
                         }
-
+                        
                         // 위에서 찾지 못했다면 기존 방식으로 시도
                         if (content.length === 0) {
                             const userSelectors = [
@@ -793,7 +796,7 @@
                                 '.message-bubble div[class*="user-message"]',
                                 '.message-bubble div:not([class*="css-l6zbeu"])'
                             ];
-
+                            
                             let userMessageBubble = null;
                             for (const selector of userSelectors) {
                                 userMessageBubble = item.querySelector(selector);
@@ -802,12 +805,12 @@
                                     break;
                                 }
                             }
-
+                            
                             // 선택자로 찾지 못했다면 메시지 버블 직접 검색
                             if (!userMessageBubble) {
                                 const allDivs = item.querySelectorAll('.message-bubble div');
                                 console.log('메시지 버블 내 모든 div 수:', allDivs.length);
-
+                                
                                 // 텍스트 내용이 있는 첫 번째 div 선택
                                 for (const div of allDivs) {
                                     if (div.textContent.trim()) {
@@ -817,10 +820,10 @@
                                     }
                                 }
                             }
-
+                            
                             if (userMessageBubble) {
                                 let paragraphNodes = [];
-
+                                
                                 userMessageBubble.childNodes.forEach(node => {
                                     if (node.nodeType === Node.TEXT_NODE) {
                                         const text = node.textContent;
@@ -843,7 +846,7 @@
                                             if (nodeText.trim()) {
                                                 paragraphNodes.push({type: 'text', content: nodeText});
                                             }
-
+                                            
                                             // 내부에 이미지가 있는지 확인
                                             const nestedImages = node.querySelectorAll('img');
                                             if (nestedImages.length > 0) {
@@ -858,7 +861,7 @@
                                         }
                                     }
                                 });
-
+                                
                                 if (paragraphNodes.length > 0) {
                                     content.push({
                                         type: 'paragraph',
@@ -943,15 +946,15 @@
                     startTime: new Date(),
                     errors: []
                 };
-
+                
                 // 로컬 스토리지에 진행 중인 백업 세션 저장
                 localStorage.setItem('wrtn_backup_in_progress', 'true');
                 localStorage.setItem('wrtn_backup_chat_list', JSON.stringify(chatList));
-
+                
                 // 이벤트를 통해 진행 상황 업데이트
                 const updateProgress = () => {
-                    const event = new CustomEvent('wrtn_backup_progress', {
-                        detail: this.backupStatus
+                    const event = new CustomEvent('wrtn_backup_progress', { 
+                        detail: this.backupStatus 
                     });
                     document.dispatchEvent(event);
                 };
@@ -965,22 +968,22 @@
                         localStorage.removeItem('wrtn_backup_chat_list');
                         return allChatsData;
                     }
-
+                    
                     const chat = chatList[index];
                     this.backupStatus.currentChat = chat.characterName;
                     this.backupStatus.processedChats = index;
                     updateProgress();
-
+                    
                     try {
                         console.log(`채팅 ${index + 1}/${chatList.length} 처리 중: ${chat.characterName}`);
-
+                        
                         // 채팅방으로 이동
                         if (chat.chatUrl) {
                             // 현재 URL 저장
                             const currentUrl = window.location.href;
                             localStorage.setItem('wrtn_backup_current_index', index.toString());
                             localStorage.setItem('wrtn_backup_return_url', currentUrl);
-
+                            
                             // 페이지 이동
                             window.location.href = chat.chatUrl;
                             return null; // 페이지 이동 후 현재 함수 종료
@@ -992,18 +995,18 @@
                             error: error.message
                         });
                         updateProgress();
-
+                        
                         allChatsData.fullChats.push({
                             ...chat,
                             error: error.message,
                             messages: []
                         });
-
+                        
                         // 다음 채팅으로 진행
                         return processNextChat(index + 1);
                     }
                 };
-
+                
                 // 백업 프로세스 시작 또는 재개
                 const inProgressIndex = parseInt(localStorage.getItem('wrtn_backup_current_index'), 10);
                 if (!isNaN(inProgressIndex) && inProgressIndex < chatList.length) {
@@ -1011,7 +1014,7 @@
                 } else {
                     return processNextChat(0);
                 }
-
+                
             } catch (error) {
                 console.error('전체 채팅 백업 실패:', error);
                 localStorage.removeItem('wrtn_backup_in_progress');
@@ -1032,10 +1035,10 @@
             try {
                 // 사이드바 메뉴에 백업 버튼 추가 시도
                 await this.addToSidebar();
-
+                
                 // createFallbackButton 호출 제거 - 중복 버튼 제거
                 console.log('백업 버튼이 사이드바 메뉴에 통합되었습니다.');
-
+                
                 // 백업 진행 중인 경우 체크
                 const inProgress = localStorage.getItem('wrtn_backup_in_progress') === 'true';
                 if (inProgress) {
@@ -1051,7 +1054,7 @@
             // 상단 메뉴 컨테이너 찾기 (캐즘 버너 참고)
             await utils.waitForElement('.css-uxwch2');
             const menuContainer = document.querySelector('.css-uxwch2');
-
+            
             if (!menuContainer || document.getElementById('crackBackupMenu')) {
                 return;
             }
@@ -1060,7 +1063,7 @@
             const backupWrap = document.createElement('div');
             backupWrap.id = 'crackBackupWrap';
             backupWrap.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
-
+            
             const backupMenu = document.createElement('div');
             backupMenu.id = 'crackBackupMenu';
             backupMenu.className = 'css-5w39sj'; // 캐즘 버너와 동일한 클래스 사용
@@ -1071,12 +1074,12 @@
                 </p>
                 <div class="css-13pmxen" style="display: flex;"></div>
             `;
-
+            
             backupMenu.addEventListener('click', () => this.showBackupModal());
-
+            
             backupWrap.appendChild(backupMenu);
             menuContainer.appendChild(backupWrap);
-
+            
             console.log('💾 뤼튼 크랙 채팅 백업 메뉴가 추가되었습니다!');
         }
 
@@ -1131,7 +1134,7 @@
                         cursor: pointer;
                         transition: all 0.3s ease;
                     ">🔥 현재 채팅방 백업</button>
-
+                    
                     <button id="backup-list" style="
                         width: 100%;
                         padding: 16px;
@@ -1145,7 +1148,7 @@
                         cursor: pointer;
                         transition: all 0.3s ease;
                     ">📋 채팅 목록만 백업</button>
-
+                    
                     <button id="backup-all" style="
                         width: 100%;
                         padding: 16px;
@@ -1160,7 +1163,7 @@
                         transition: all 0.3s ease;
                     ">🌟 전체 채팅 백업 (시간 소요)</button>
                 </div>
-
+                
                 <div style="margin-bottom: 24px;">
                     <label style="display: block; margin-bottom: 10px; color: #61605A; font-size: 15px; font-weight: 600;">📄 내보내기 형식:</label>
                     <select id="export-format" style="
@@ -1177,7 +1180,7 @@
                         <option value="txt">📝 TXT (텍스트)</option>
                     </select>
                 </div>
-
+                
                 <div style="display: flex; gap: 12px;">
                     <button id="modal-close" style="
                         flex: 1;
@@ -1192,7 +1195,7 @@
                         transition: all 0.3s ease;
                     ">❌ 취소</button>
                 </div>
-
+                
                 <div id="backup-progress" style="
                     display: none;
                     margin-top: 20px;
@@ -1204,7 +1207,7 @@
                     text-align: center;
                     font-weight: 600;
                 "></div>
-
+                
                 <div id="progress-bar-container" style="
                     display: none;
                     margin-top: 12px;
@@ -1243,14 +1246,14 @@
             document.getElementById('backup-list').addEventListener('click', () => this.backupChatList(modal));
             document.getElementById('backup-all').addEventListener('click', () => this.backupAllChats(modal));
             document.getElementById('modal-close').addEventListener('click', () => document.body.removeChild(modalOverlay));
-
+            
             // 오버레이 클릭시 닫기
             modalOverlay.addEventListener('click', (e) => {
                 if (e.target === modalOverlay) {
                     document.body.removeChild(modalOverlay);
                 }
             });
-
+            
             // 백업 진행 중인 경우 체크
             const inProgress = localStorage.getItem('wrtn_backup_in_progress') === 'true';
             if (inProgress) {
@@ -1262,16 +1265,16 @@
             const progressEl = modal.querySelector('#backup-progress');
             const progressBarContainer = modal.querySelector('#progress-bar-container');
             const progressBar = modal.querySelector('#progress-bar');
-
+            
             progressEl.style.display = 'block';
             progressEl.textContent = message;
-
+            
             if (percent >= 0) {
                 progressBarContainer.style.display = 'block';
                 progressBar.style.width = `${percent}%`;
             }
         }
-
+        
         // 백업 프로세스 재개 (페이지 로드 후)
         async resumeBackupProcess(modal) {
             try {
@@ -1279,22 +1282,22 @@
                 const currentIndex = parseInt(localStorage.getItem('wrtn_backup_current_index'), 10);
                 const returnUrl = localStorage.getItem('wrtn_backup_return_url');
                 const chatListStr = localStorage.getItem('wrtn_backup_chat_list');
-
+                
                 if (!inProgress || isNaN(currentIndex) || !chatListStr) {
                     return;
                 }
-
+                
                 const chatList = JSON.parse(chatListStr);
                 const currentChat = chatList[currentIndex];
-
+                
                 if (!currentChat) {
                     return;
                 }
-
+                
                 // 현재 URL이 처리해야 할 채팅방 URL과 일치하는지 확인
                 const currentPathname = window.location.pathname;
                 const targetPathname = new URL(currentChat.chatUrl, window.location.origin).pathname;
-
+                
                 if (currentPathname === targetPathname) {
                     // 백업 시작 시간 가져오기 또는 설정
                     let backupStartTime = localStorage.getItem('wrtn_backup_start_time');
@@ -1302,13 +1305,13 @@
                         backupStartTime = Date.now().toString();
                         localStorage.setItem('wrtn_backup_start_time', backupStartTime);
                     }
-
+                    
                     // 진행률 및 예상 남은 시간 계산
                     const progressPercent = (currentIndex / chatList.length) * 100;
                     const elapsedTime = Date.now() - parseInt(backupStartTime, 10);
                     const estimatedTotalTime = (elapsedTime / (currentIndex + 1)) * chatList.length;
                     const estimatedTimeRemaining = Math.max(0, estimatedTotalTime - elapsedTime);
-
+                    
                     // 남은 시간 포맷팅
                     let etaText = '계산 중...';
                     if (currentIndex > 0) { // 최소 1개 이상 처리 후 계산
@@ -1322,44 +1325,44 @@
                             etaText = `약 ${hours}시간 ${minutes}분`;
                         }
                     }
-
+                    
                     // 현재 채팅방에서 메시지 추출
                     const tempModal = modal || this.createTemporaryProgressModal();
-                    this.showProgress(tempModal,
-                        `🔄 ${currentChat.characterName} 채팅 백업 중... (${currentIndex + 1}/${chatList.length})`,
+                    this.showProgress(tempModal, 
+                        `🔄 ${currentChat.characterName} 채팅 백업 중... (${currentIndex + 1}/${chatList.length})`, 
                         progressPercent);
-
+                    
                     // ETA 표시
                     const etaContainer = tempModal.querySelector('#eta-container');
                     if (etaContainer) {
                         etaContainer.textContent = `예상 남은 시간: ${etaText}`;
                         etaContainer.style.display = 'block';
                     }
-
+                    
                     try {
                         // 페이지 로드를 위한 짧은 대기
                         await new Promise(resolve => setTimeout(resolve, 2000));
-
+                        
                         // 메시지 추출
                         const chatData = await this.extractor.extractCurrentChatMessages();
-
+                        
                         // 채팅 데이터 로그 출력 (디버깅용)
                         console.log('추출된 채팅 데이터:', chatData);
                         console.log('메시지 수:', chatData.messages.length);
                         console.log('사용자 메시지 수:', chatData.messages.filter(m => m.author === '사용자').length);
-
+                        
                         if (chatData.messages.length === 0) {
                             console.warn('채팅 메시지가 추출되지 않았습니다. 다시 시도합니다...');
                             // 메시지가 없으면 잠시 기다렸다가 다시 시도
                             await new Promise(resolve => setTimeout(resolve, 3000));
                             const retryData = await this.extractor.extractCurrentChatMessages();
-
+                            
                             if (retryData.messages.length > 0) {
                                 console.log('재시도 성공! 메시지 수:', retryData.messages.length);
                                 chatData.messages = retryData.messages;
                             }
                         }
-
+                        
                         // 결과 저장 (로컬 스토리지에)
                         const backupResults = JSON.parse(localStorage.getItem('wrtn_backup_results') || '{"fullChats":[]}');
                         backupResults.fullChats.push({
@@ -1367,7 +1370,7 @@
                             ...chatData
                         });
                         localStorage.setItem('wrtn_backup_results', JSON.stringify(backupResults));
-
+                        
                         // 다음 채팅방으로 이동 또는 완료
                         const nextIndex = currentIndex + 1;
                         if (nextIndex < chatList.length) {
@@ -1376,9 +1379,9 @@
                             window.location.href = nextChat.chatUrl;
                         } else {
                             // 백업 완료, 최종 결과 처리
-                            this.showProgress(modal || this.createTemporaryProgressModal(),
+                            this.showProgress(modal || this.createTemporaryProgressModal(), 
                                 '✅ 모든 채팅 백업 완료! 결과 다운로드 준비 중...', 100);
-
+                            
                             const finalResults = {
                                 summary: {
                                     totalChats: chatList.length,
@@ -1388,11 +1391,11 @@
                                 chatList: chatList,
                                 fullChats: backupResults.fullChats
                             };
-
+                            
                             // 결과 다운로드
                             const format = localStorage.getItem('wrtn_backup_format') || 'html';
                             this.exportData(finalResults, 'wrtn-crack-all-chats', format);
-
+                            
                             // 임시 데이터 정리
                             localStorage.removeItem('wrtn_backup_in_progress');
                             localStorage.removeItem('wrtn_backup_current_index');
@@ -1401,7 +1404,7 @@
                             localStorage.removeItem('wrtn_backup_results');
                             localStorage.removeItem('wrtn_backup_format');
                             localStorage.removeItem('wrtn_backup_start_time');
-
+                            
                             // 시작 페이지로 복귀 (옵션)
                             if (returnUrl) {
                                 setTimeout(() => {
@@ -1411,9 +1414,9 @@
                         }
                     } catch (error) {
                         console.error('채팅 백업 중 오류:', error);
-                        this.showProgress(modal || this.createTemporaryProgressModal(),
+                        this.showProgress(modal || this.createTemporaryProgressModal(), 
                             `❌ 오류: ${error.message}. 다음 채팅으로 진행합니다.`);
-
+                        
                         // 오류가 발생해도 다음 채팅으로 진행
                         const nextIndex = currentIndex + 1;
                         if (nextIndex < chatList.length) {
@@ -1429,7 +1432,7 @@
                 console.error('백업 재개 중 오류:', error);
             }
         }
-
+        
         // 임시 진행 상황 모달 (페이지 전환 후 표시용)
         createTemporaryProgressModal() {
             // 기존 모달이 있으면 제거
@@ -1437,7 +1440,7 @@
             if (existingModal) {
                 return existingModal;
             }
-
+            
             // 새 모달 생성
             const modalOverlay = document.createElement('div');
             modalOverlay.style.cssText = `
@@ -1468,7 +1471,7 @@
 
             modal.innerHTML = `
                 <h2 style="margin: 0 0 24px 0; color: #1A1918; font-size: 24px; font-weight: 700; text-align: center;">💾 채팅 백업 진행 중</h2>
-
+                
                 <div id="backup-progress" style="
                     margin-top: 20px;
                     padding: 16px;
@@ -1479,7 +1482,7 @@
                     text-align: center;
                     font-weight: 600;
                 ">백업 진행 중...</div>
-
+                
                 <div id="progress-bar-container" style="
                     margin-top: 12px;
                     background: #E5E5E1;
@@ -1494,14 +1497,14 @@
                         transition: width 0.3s ease;
                     "></div>
                 </div>
-
+                
                 <div id="eta-container" style="
                     margin-top: 10px;
                     font-size: 13px;
                     color: #61605A;
                     text-align: center;
                 ">예상 남은 시간: 계산 중...</div>
-
+                
                 <button id="cancel-backup" style="
                     width: 100%;
                     padding: 12px;
@@ -1519,7 +1522,7 @@
 
             modalOverlay.appendChild(modal);
             document.body.appendChild(modalOverlay);
-
+            
             // 취소 버튼 이벤트
             modal.querySelector('#cancel-backup').addEventListener('click', () => {
                 localStorage.removeItem('wrtn_backup_in_progress');
@@ -1530,7 +1533,7 @@
                 localStorage.removeItem('wrtn_backup_start_time');
                 document.body.removeChild(modalOverlay);
             });
-
+            
             return modal;
         }
 
@@ -1539,10 +1542,10 @@
                 this.showProgress(modal, '🔄 현재 채팅방 백업 중...');
                 const chatData = await this.extractor.extractCurrentChatMessages();
                 const format = document.getElementById('export-format').value;
-
+                
                 this.exportData(chatData, `wrtn-crack-chat-${chatData.characterName || chatData.chatId}`, format);
                 this.showProgress(modal, '✅ 백업 완료!');
-
+                
                 setTimeout(() => {
                     document.body.removeChild(modal.closest('[style*="position: fixed"]'));
                 }, 2000);
@@ -1555,21 +1558,21 @@
         async backupChatList(modal) {
             try {
                 this.showProgress(modal, '🔄 채팅 목록을 불러오는 중... (자동 스크롤 진행 중)');
-
+                
                 // 진행 표시줄 표시
                 const progressBarContainer = modal.querySelector('#progress-bar-container');
                 const progressBar = modal.querySelector('#progress-bar');
                 progressBarContainer.style.display = 'block';
                 progressBar.style.width = '10%'; // 초기 진행률
-
+                
                 // 모바일 환경에서 추가적인 준비 작업 수행
                 if (this.extractor.isMobile) {
                     this.showProgress(modal, '🔄 모바일 환경에서 채팅 목록 준비 중...', 5);
-
+                    
                     // 1. 기존 모달창을 임시로 숨김 (닫지는 않음)
                     const originalDisplay = modal.style.display;
                     modal.style.display = 'none';
-
+                    
                     // 2. 우측 사이드바 닫기 시도 (채팅 페이지에 있을 경우)
                     const rightCloseButtons = document.querySelectorAll('button[aria-label="닫기"], button.close-btn, button svg[viewBox="0 0 24 24"][width="24"][height="24"]');
                     for (const btn of rightCloseButtons) {
@@ -1581,16 +1584,16 @@
                             console.log('버튼 클릭 실패:', e);
                         }
                     }
-
+                    
                     // 3. 좌측 햄버거 메뉴 열기 (명시적 시도)
                     const hamburgerSelectors = [
-                        'button.css-19ekx34',
-                        'button.e1h4uvut1',
+                        'button.css-19ekx34', 
+                        'button.e1h4uvut1', 
                         'button[display="flex"][height="40px"]',
                         'button svg[viewBox="0 0 24 24"][width="24"][height="24"]',
                         'button svg path[d="M21 6.4H3V4.8h18zm0 6.5H3v-1.6h18zM3 19.4h18v-1.6H3z"]'
                     ];
-
+                    
                     let hamburgerOpened = false;
                     for (const selector of hamburgerSelectors) {
                         const btn = document.querySelector(selector);
@@ -1609,10 +1612,10 @@
                             }
                         }
                     }
-
+                    
                     // 4. 채팅 항목 있는지 확인하고 없으면 채팅 탭 클릭 시도
                     let chatItemsFound = document.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]').length > 0;
-
+                    
                     if (!chatItemsFound && hamburgerOpened) {
                         // 채팅 탭 버튼 찾기
                         const chatTabSelectors = [
@@ -1622,7 +1625,7 @@
                             'a[class*="tab"]',
                             'p[class*="css-6pyka7"]'
                         ];
-
+                        
                         for (const selector of chatTabSelectors) {
                             const elements = document.querySelectorAll(selector);
                             for (const el of elements) {
@@ -1641,12 +1644,12 @@
                             if (chatItemsFound) break;
                         }
                     }
-
+                    
                     // 5. 모달창 다시 표시
                     modal.style.display = originalDisplay;
                     this.showProgress(modal, '🔄 채팅 목록을 불러오는 중... (자동 스크롤 진행 중)', 10);
                 }
-
+                
                 // 스크롤 진행 상황 업데이트를 위한 이벤트 리스너
                 const scrollUpdateListener = (e) => {
                     if (e.detail && typeof e.detail.percent === 'number') {
@@ -1656,21 +1659,21 @@
                         this.showProgress(modal, `🔄 채팅 목록을 불러오는 중... (스크롤 ${Math.round(e.detail.percent)}%)`);
                     }
                 };
-
+                
                 document.addEventListener('wrtn_scroll_progress', scrollUpdateListener);
-
+                
                 // 채팅 목록 추출 시작
                 const chatList = await this.extractor.extractChatList();
-
+                
                 // 이벤트 리스너 제거
                 document.removeEventListener('wrtn_scroll_progress', scrollUpdateListener);
-
+                
                 // 데이터 처리 진행률 표시
                 progressBar.style.width = '80%';
                 this.showProgress(modal, '🔄 채팅 데이터 처리 중...');
-
+                
                 const format = document.getElementById('export-format').value;
-
+                
                 const data = {
                     summary: {
                         totalChats: chatList.length,
@@ -1679,13 +1682,13 @@
                     },
                     chatList: chatList
                 };
-
+                
                 // 완료 표시
                 progressBar.style.width = '100%';
-
+                
                 this.exportData(data, 'wrtn-crack-chat-list', format);
                 this.showProgress(modal, `✅ 채팅 목록 백업 완료! (총 ${chatList.length}개 채팅방)`);
-
+                
                 setTimeout(() => {
                     document.body.removeChild(modal.closest('[style*="position: fixed"]'));
                 }, 2000);
@@ -1700,18 +1703,18 @@
                 // 백업 시작 시 포맷 저장
                 const format = document.getElementById('export-format').value;
                 localStorage.setItem('wrtn_backup_format', format);
-
+                
                 // 초기 상태 표시
                 this.showProgress(modal, '🔄 전체 채팅 백업 준비 중...', 0);
-
+                
                 // 모바일 환경에서 추가적인 준비 작업 수행
                 if (this.extractor.isMobile) {
                     this.showProgress(modal, '🔄 모바일 환경에서 채팅 목록 준비 중...', 5);
-
+                    
                     // 1. 기존 모달창을 임시로 숨김 (닫지는 않음)
                     const originalDisplay = modal.style.display;
                     modal.style.display = 'none';
-
+                    
                     // 2. 우측 사이드바 닫기 시도 (채팅 페이지에 있을 경우)
                     const rightCloseButtons = document.querySelectorAll('button[aria-label="닫기"], button.close-btn, button svg[viewBox="0 0 24 24"][width="24"][height="24"]');
                     for (const btn of rightCloseButtons) {
@@ -1723,16 +1726,16 @@
                             console.log('버튼 클릭 실패:', e);
                         }
                     }
-
+                    
                     // 3. 좌측 햄버거 메뉴 열기 (명시적 시도)
                     const hamburgerSelectors = [
-                        'button.css-19ekx34',
-                        'button.e1h4uvut1',
+                        'button.css-19ekx34', 
+                        'button.e1h4uvut1', 
                         'button[display="flex"][height="40px"]',
                         'button svg[viewBox="0 0 24 24"][width="24"][height="24"]',
                         'button svg path[d="M21 6.4H3V4.8h18zm0 6.5H3v-1.6h18zM3 19.4h18v-1.6H3z"]'
                     ];
-
+                    
                     let hamburgerOpened = false;
                     for (const selector of hamburgerSelectors) {
                         const btn = document.querySelector(selector);
@@ -1751,10 +1754,10 @@
                             }
                         }
                     }
-
+                    
                     // 4. 채팅 항목 있는지 확인하고 없으면 채팅 탭 클릭 시도
                     let chatItemsFound = document.querySelectorAll('a[href*="/u/"][href*="/c/"], a[href*="/c/"]').length > 0;
-
+                    
                     if (!chatItemsFound && hamburgerOpened) {
                         // 채팅 탭 버튼 찾기
                         const chatTabSelectors = [
@@ -1764,7 +1767,7 @@
                             'a[class*="tab"]',
                             'p[class*="css-6pyka7"]'
                         ];
-
+                        
                         for (const selector of chatTabSelectors) {
                             const elements = document.querySelectorAll(selector);
                             for (const el of elements) {
@@ -1783,25 +1786,25 @@
                             if (chatItemsFound) break;
                         }
                     }
-
+                    
                     // 5. 모달창 다시 표시
                     modal.style.display = originalDisplay;
                     this.showProgress(modal, '🔄 채팅 목록 불러오는 중...', 10);
                 }
-
+                
                 // 채팅 목록 가져오기
                 const chatList = await this.extractor.extractChatList();
                 if (!chatList || chatList.length === 0) {
                     throw new Error('채팅 목록을 가져올 수 없습니다.');
                 }
-
+                
                 // 백업 시작
                 this.showProgress(
-                    modal,
-                    `🔄 전체 채팅 백업 시작... (총 ${chatList.length}개)`,
+                    modal, 
+                    `🔄 전체 채팅 백업 시작... (총 ${chatList.length}개)`, 
                     15
                 );
-
+                
                 // 초기 백업 상태 설정
                 localStorage.setItem('wrtn_backup_in_progress', 'true');
                 localStorage.setItem('wrtn_backup_current_index', '0');
@@ -1809,16 +1812,16 @@
                 localStorage.setItem('wrtn_backup_return_url', window.location.href);
                 localStorage.setItem('wrtn_backup_results', JSON.stringify({fullChats: []}));
                 localStorage.setItem('wrtn_backup_start_time', Date.now().toString());
-
+                
                 // 첫 번째 채팅방으로 이동하여 백업 시작
                 if (chatList.length > 0) {
                     window.location.href = chatList[0].chatUrl;
                 }
-
+                
             } catch (error) {
                 this.showProgress(modal, `❌ 오류: ${error.message}`);
                 console.error('백업 오류:', error);
-
+                
                 // 백업 상태 초기화
                 localStorage.removeItem('wrtn_backup_in_progress');
                 localStorage.removeItem('wrtn_backup_current_index');
@@ -1831,7 +1834,7 @@
 
         exportData(data, filename, format) {
             const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-
+            
             switch (format) {
                 case 'json':
                     utils.downloadFile(
@@ -1840,7 +1843,7 @@
                         'application/json'
                     );
                     break;
-
+                    
                 case 'html':
                     const htmlContent = this.generateHTML(data);
                     utils.downloadFile(
@@ -1849,7 +1852,7 @@
                         'text/html'
                     );
                     break;
-
+                    
                 case 'txt':
                     const txtContent = this.generateTXT(data);
                     utils.downloadFile(
@@ -1878,14 +1881,14 @@
             padding: 0;
             box-sizing: border-box;
         }
-
+        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
             background: #0a0a0a;
             color: #ffffff;
             line-height: 1.6;
         }
-
+        
         /* 헤더 스타일 */
         .header {
             background: #141414;
@@ -1896,7 +1899,7 @@
             backdrop-filter: blur(10px);
             background: rgba(20, 20, 20, 0.95);
         }
-
+        
         .header-content {
             max-width: 900px;
             margin: 0 auto;
@@ -1905,7 +1908,7 @@
             align-items: center;
             gap: 16px;
         }
-
+        
         .character-avatar {
             width: 48px;
             height: 48px;
@@ -1913,19 +1916,19 @@
             object-fit: cover;
             border: 2px solid #FF4432;
         }
-
+        
         .character-info h1 {
             font-size: 20px;
             font-weight: 600;
             color: #ffffff;
             margin-bottom: 4px;
         }
-
+        
         .character-info .meta {
             font-size: 13px;
             color: #8a8a8a;
         }
-
+        
         /* 채팅 컨테이너 */
         .chat-container {
             max-width: 900px;
@@ -1933,13 +1936,13 @@
             padding: 20px;
             min-height: calc(100vh - 100px);
         }
-
+        
         /* 메시지 스타일 */
         .message {
             margin-bottom: 20px;
             animation: fadeIn 0.3s ease-in;
         }
-
+        
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -1950,30 +1953,30 @@
                 transform: translateY(0);
             }
         }
-
+        
         .message.user {
             display: flex;
             flex-direction: column;
             align-items: flex-end;
         }
-
+        
         .message.ai {
             display: flex;
             flex-direction: column;
             align-items: flex-start;
         }
-
+        
         .message-header {
             display: flex;
             align-items: center;
             gap: 8px;
             margin-bottom: 6px;
         }
-
+        
         .message.user .message-header {
             display: none; /* 사용자 메시지는 헤더 숨김 */
         }
-
+        
         .message-avatar {
             width: 32px;
             height: 32px;
@@ -1981,13 +1984,13 @@
             flex-shrink: 0;
             object-fit: cover;
         }
-
+        
         .message-author {
             font-size: 14px;
             font-weight: 600;
             color: #ffffff;
         }
-
+        
         .message-content {
             max-width: 65%;
             background: #1a1a1a;
@@ -1995,35 +1998,35 @@
             border-radius: 18px;
             position: relative;
         }
-
+        
         .message.user .message-content {
             background: #FF4432;
             color: white;
         }
-
+        
         .message-text {
             font-size: 15px;
             white-space: pre-wrap;
             word-break: break-word;
         }
-
+        
         .message-text em {
             font-style: italic;
             opacity: 0.9;
         }
-
+        
         .message-time {
             font-size: 11px;
             color: #6a6a6a;
             margin-top: 6px;
             align-self: flex-start;
         }
-
+        
         .message.user .message-time {
             color: rgba(255, 255, 255, 0.7);
             align-self: flex-end;
         }
-
+        
         /* 메시지 내 이미지 스타일 */
         .message-image {
             max-width: 100%;
@@ -2031,21 +2034,21 @@
             margin: 8px 0;
             display: block;
         }
-
+        
         .message-paragraph {
             margin-bottom: 12px;
         }
-
+        
         .message-paragraph:last-child {
             margin-bottom: 0;
         }
-
+        
         /* 마크다운 메시지 스타일 */
         .message-markdown {
             word-break: break-word;
             line-height: 1.6;
         }
-
+        
         .message-markdown .code-block {
             background: rgba(0, 0, 0, 0.1) !important;
             border: 1px solid rgba(0, 0, 0, 0.2) !important;
@@ -2058,7 +2061,7 @@
             overflow-x: auto !important;
             white-space: pre-wrap !important;
         }
-
+        
         .message-markdown .quote-block {
             border-left: 3px solid rgba(0, 0, 0, 0.3) !important;
             margin: 8px 0 !important;
@@ -2067,27 +2070,27 @@
             font-style: italic !important;
             border-radius: 0 4px 4px 0 !important;
         }
-
+        
         /* 다크 테마 대응 */
         @media (prefers-color-scheme: dark) {
             .message-markdown .code-block {
                 background: rgba(255, 255, 255, 0.1) !important;
                 border-color: rgba(255, 255, 255, 0.2) !important;
             }
-
+            
             .message-markdown .quote-block {
                 border-left-color: rgba(255, 255, 255, 0.3) !important;
                 background: rgba(255, 255, 255, 0.05) !important;
             }
         }
-
+        
         /* 날짜 구분선 */
         .date-divider {
             text-align: center;
             margin: 30px 0;
             position: relative;
         }
-
+        
         .date-divider::before {
             content: '';
             position: absolute;
@@ -2097,7 +2100,7 @@
             height: 1px;
             background: #2a2a2a;
         }
-
+        
         .date-divider span {
             background: #0a0a0a;
             padding: 0 16px;
@@ -2105,14 +2108,14 @@
             font-size: 13px;
             position: relative;
         }
-
+        
         /* 채팅 목록 스타일 */
         .chat-list {
             max-width: 700px; /* PC에서 너비 제한 */
             margin: 0 auto;
             padding: 20px;
         }
-
+        
         .chat-item {
             background: #1a1a1a;
             border-radius: 12px;
@@ -2125,12 +2128,12 @@
             text-decoration: none;
             color: inherit;
         }
-
+        
         .chat-item:hover {
             background: #222;
             transform: translateX(4px);
         }
-
+        
         .chat-item-avatar {
             width: 48px;
             height: 48px;
@@ -2138,18 +2141,18 @@
             object-fit: cover;
             flex-shrink: 0;
         }
-
+        
         .chat-item-content {
             flex: 1;
             overflow: hidden;
         }
-
+        
         .chat-item-name {
             font-weight: 600;
             margin-bottom: 4px;
             color: #FF4432;
         }
-
+        
         .chat-item-preview {
             font-size: 14px;
             color: #8a8a8a;
@@ -2157,22 +2160,22 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
+        
         .chat-item-time {
             font-size: 12px;
             color: #6a6a6a;
             margin-top: 4px;
         }
-
+        
         /* 전체 채팅 컨테이너 스타일 */
         .all-chats-container {
             display: none; /* 기본적으로 숨김 */
         }
-
+        
         .all-chats-container.active {
             display: block;
         }
-
+        
         /* 채팅방 탭 스타일 */
         .sticky-chat-list {
             position: sticky;
@@ -2183,12 +2186,12 @@
             margin-bottom: 20px;
             transition: transform 0.3s ease, opacity 0.3s ease;
         }
-
+        
         .sticky-chat-list.hidden {
             transform: translateY(-100%);
             opacity: 0;
         }
-
+        
         .chat-list-header {
             display: flex;
             justify-content: space-between;
@@ -2197,14 +2200,14 @@
             max-width: 900px;
             margin: 0 auto;
         }
-
+        
         .chat-list-header h2 {
             font-size: 18px;
             font-weight: 600;
             color: #FF4432;
             margin: 0;
         }
-
+        
         .toggle-list-btn {
             background: #2a2a2a;
             border: none;
@@ -2218,20 +2221,20 @@
             transition: all 0.2s ease;
             color: #aaa;
         }
-
+        
         .toggle-list-btn:hover {
             background: #333;
             transform: scale(1.1);
         }
-
+        
         .toggle-list-btn svg {
             transition: transform 0.3s ease;
         }
-
+        
         .chat-list-header.collapsed .toggle-list-btn svg {
             transform: rotate(-90deg);
         }
-
+        
         .chat-list-items {
             max-width: 900px;
             margin: 0 auto;
@@ -2243,18 +2246,18 @@
             overflow-y: auto;
             transition: all 0.3s ease;
         }
-
+        
         .chat-list-items.collapsed {
             max-height: 0;
             padding: 0 20px;
             overflow: hidden;
         }
-
+        
         .chat-list-link {
             text-decoration: none;
             color: inherit;
         }
-
+        
         .sticky-chat-list .chat-item {
             background: #1a1a1a;
             border-radius: 8px;
@@ -2265,13 +2268,13 @@
             transition: all 0.2s ease;
             margin: 0;
         }
-
+        
         .sticky-chat-list .chat-item:hover {
             background: #222;
             transform: translateY(-2px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
-
+        
         .sticky-chat-list .chat-item-avatar {
             width: 40px;
             height: 40px;
@@ -2279,12 +2282,12 @@
             object-fit: cover;
             flex-shrink: 0;
         }
-
+        
         .sticky-chat-list .chat-item-content {
             flex: 1;
             overflow: hidden;
         }
-
+        
         .sticky-chat-list .chat-item-name {
             font-weight: 600;
             font-size: 14px;
@@ -2294,7 +2297,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-
+        
         .chat-item-meta {
             display: flex;
             justify-content: space-between;
@@ -2302,27 +2305,27 @@
             font-size: 12px;
             color: #6a6a6a;
         }
-
+        
         .chat-item-id {
             color: #FF4432;
             font-weight: 600;
         }
-
+        
         /* 채팅 섹션 스타일 */
         .all-chats-wrapper {
             max-width: 900px;
             margin: 0 auto;
         }
-
+        
         .chat-section {
             margin-bottom: 100px; /* 섹션 간 간격 증가 */
             scroll-margin-top: 140px;
         }
-
+        
         .chat-section:last-child {
             margin-bottom: 60px;
         }
-
+        
         .chat-section-header {
             display: flex;
             justify-content: space-between;
@@ -2332,13 +2335,13 @@
             border-radius: 12px 12px 0 0;
             margin-bottom: -1px;
         }
-
+        
         .chat-section-header h2 {
             color: #FF4432;
             margin: 0;
             font-size: 20px;
         }
-
+        
         .chat-section-number {
             background: #FF4432;
             color: white;
@@ -2347,33 +2350,33 @@
             font-size: 14px;
             font-weight: 600;
         }
-
+        
         .chat-section .chat-container {
             background: #0a0a0a;
             border: 1px solid #2a2a2a;
             border-radius: 0 0 12px 12px;
             padding: 20px;
         }
-
+        
         /* 스크롤바 스타일 */
         .chat-list-items::-webkit-scrollbar {
             width: 6px;
         }
-
+        
         .chat-list-items::-webkit-scrollbar-track {
             background: #1a1a1a;
             border-radius: 3px;
         }
-
+        
         .chat-list-items::-webkit-scrollbar-thumb {
             background: #FF4432;
             border-radius: 3px;
         }
-
+        
         .chat-list-items::-webkit-scrollbar-thumb:hover {
             background: #FF5B4A;
         }
-
+        
         /* 백 투 탑 버튼 */
         .back-to-top {
             position: fixed;
@@ -2394,18 +2397,18 @@
             opacity: 0;
             visibility: hidden;
         }
-
+        
         .back-to-top.visible {
             opacity: 1;
             visibility: visible;
         }
-
+        
         .back-to-top:hover {
             background: #FF5B4A;
             transform: translateY(-3px);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); /* 흐린 빛 효과 제거 */
         }
-
+        
         /* 모바일 최적화 */
         @media screen and (max-width: 768px) {
             .message-content {
@@ -2413,109 +2416,109 @@
                 padding: 10px 14px;
                 font-size: 14px;
             }
-
+            
             .chat-container {
                 padding: 15px 10px;
             }
-
+            
             .header-content {
                 padding: 15px;
             }
-
+            
             .message {
                 margin-bottom: 16px;
             }
-
+            
             .message-avatar {
                 width: 28px;
                 height: 28px;
             }
-
+            
             .sticky-chat-list {
                 top: 70px;
             }
-
+            
             .chat-list-header {
                 padding: 12px 15px;
             }
-
+            
             .chat-list-header h2 {
                 font-size: 16px;
             }
-
+            
             .chat-list-items {
                 grid-template-columns: 1fr;
                 gap: 8px;
                 padding: 0 15px 12px;
                 max-height: 250px;
             }
-
+            
             .sticky-chat-list .chat-item {
                 padding: 10px;
             }
-
+            
             .sticky-chat-list .chat-item-avatar {
                 width: 36px;
                 height: 36px;
             }
-
+            
             .chat-section {
                 scroll-margin-top: 120px;
                 margin-bottom: 40px;
             }
-
+            
             .chat-section-header {
                 padding: 15px;
             }
-
+            
             .chat-section-header h2 {
                 font-size: 18px;
             }
-
+            
             .back-to-top {
                 width: 40px;
                 height: 40px;
                 bottom: 20px;
                 right: 20px;
             }
-
+            
             .date-divider {
                 margin: 20px 0;
             }
-
+            
             .date-divider span {
                 font-size: 12px;
             }
         }
-
+        
         /* 더 작은 모바일 화면 */
         @media screen and (max-width: 480px) {
             .message-content {
                 max-width: 90%; /* 더 작은 화면에서 메시지 버블 너비 최대화 */
             }
-
+            
             .chat-container {
                 padding: 10px 8px;
             }
-
+            
             .chat-list-header h2 {
                 font-size: 14px;
             }
-
+            
             .toggle-list-btn {
                 width: 28px;
                 height: 28px;
             }
-
+            
             .sticky-chat-list .chat-item-name {
                 font-size: 13px;
             }
-
+            
             .chat-item-meta {
                 font-size: 11px;
             }
         }
-
+        
         /* 푸터 */
         .footer {
             text-align: center;
@@ -2525,7 +2528,7 @@
             border-top: 1px solid #2a2a2a;
             margin-top: 60px;
         }
-
+        
         /* 백업 정보 배너 */
         .backup-info {
             background: linear-gradient(135deg, #FF4432 0%, #FF6B5A 100%);
@@ -2534,21 +2537,21 @@
             text-align: center;
             font-size: 14px;
         }
-
+        
         /* 스크롤바 스타일 */
         ::-webkit-scrollbar {
             width: 8px;
         }
-
+        
         ::-webkit-scrollbar-track {
             background: #0a0a0a;
         }
-
+        
         ::-webkit-scrollbar-thumb {
             background: #333;
             border-radius: 4px;
         }
-
+        
         ::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
@@ -2576,7 +2579,7 @@
             </div>
         </div>
     </div>
-
+    
     <div class="chat-container">
 `;
 
@@ -2596,7 +2599,7 @@
 
                     // 메시지
                     const isUser = msg.author === '사용자';
-
+                    
                     html += `
         <div class="message ${isUser ? 'user' : 'ai'}">
 `;
@@ -2620,7 +2623,7 @@
                         msg.content.forEach(contentItem => {
                             if (contentItem.type === 'paragraph') {
                                 html += `<div class="message-paragraph">`;
-
+                                
                                 contentItem.nodes.forEach(node => {
                                     if (node.type === 'text') {
                                         if (node.raw) {
@@ -2639,18 +2642,18 @@
                                         html += `<img src="${node.url}" alt="${node.alt || '이미지'}" class="message-image">`;
                                     }
                                 });
-
+                                
                                 html += `</div>`;
                             } else if (contentItem.type === 'markdown') {
                                 // 마크다운 콘텐츠 처리
                                 console.log('HTML 생성 - 마크다운 콘텐츠 처리:', contentItem.htmlContent || contentItem.content);
-
+                                
                                 if (contentItem.isHtml && contentItem.htmlContent) {
                                     // HTML 문자열을 파싱하여 DOM으로 변환
                                     const tempDiv = document.createElement('div');
                                     tempDiv.innerHTML = contentItem.htmlContent;
                                     const messageContainer = tempDiv.firstChild;
-
+                                    
                                     if (messageContainer) {
                                         const processedHtml = this.processMarkdownHtml(messageContainer);
                                         console.log('HTML DOM 처리 결과:', processedHtml);
@@ -2728,7 +2731,7 @@
                 </div>
             </a>`;
                     });
-
+                    
                     html += `
         </div>
     </div>
@@ -2786,7 +2789,7 @@
         </div>
 `;
                             }
-
+                            
                             const isUser = msg.author === '사용자';
                             html += `
         <div class="message ${isUser ? 'user' : 'ai'}">
@@ -2810,7 +2813,7 @@
                                 msg.content.forEach(contentItem => {
                                     if (contentItem.type === 'paragraph') {
                                         html += `<div class="message-paragraph">`;
-
+                                        
                                         contentItem.nodes.forEach(node => {
                                             if (node.type === 'text') {
                                                 if (node.raw) {
@@ -2829,18 +2832,18 @@
                                                 html += `<img src="${node.url}" alt="${node.alt || '이미지'}" class="message-image">`;
                                             }
                                         });
-
+                                        
                                         html += `</div>`;
                                     } else if (contentItem.type === 'markdown') {
                                         // 마크다운 콘텐츠 처리
                                         console.log('전체 채팅 - HTML 생성 중 마크다운 콘텐츠 처리:', contentItem.htmlContent || contentItem.content);
-
+                                        
                                         if (contentItem.isHtml && contentItem.htmlContent) {
                                             // HTML 문자열을 파싱하여 DOM으로 변환
                                             const tempDiv = document.createElement('div');
                                             tempDiv.innerHTML = contentItem.htmlContent;
                                             const messageContainer = tempDiv.firstChild;
-
+                                            
                                             if (messageContainer) {
                                                 const processedHtml = this.processMarkdownHtml(messageContainer);
                                                 console.log('전체 채팅 - HTML DOM 처리 결과:', processedHtml);
@@ -2862,7 +2865,7 @@
                                 // 이전 버전과의 호환성
                                 html += `<div class="message-text">${this.escapeHtml(msg.message)}</div>`;
                             }
-
+                            
                             html += `
             </div>
             ${msg.timestamp ? `<div class="message-time">${msg.timestamp}</div>` : ''}
@@ -2888,17 +2891,17 @@
             <path d="M7 14l5-5 5 5z"/>
         </svg>
     </button>
-
+    
     <script>
         // 채팅 목록 토글 기능
         function toggleChatList() {
             const header = document.querySelector('.chat-list-header');
             const items = document.getElementById('chat-list-items');
-
+            
             header.classList.toggle('collapsed');
             items.classList.toggle('collapsed');
         }
-
+        
         // 부드러운 스크롤 기능
         function scrollToChat(event, chatId) {
             event.preventDefault();
@@ -2907,12 +2910,12 @@
                 element.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
         }
-
+        
         // 맨 위로 스크롤
         function scrollToTop() {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
-
+        
         // 백 투 탑 버튼 표시/숨김
         window.addEventListener('scroll', function() {
             const backToTop = document.getElementById('backToTop');
@@ -2922,19 +2925,19 @@
                 backToTop.classList.remove('visible');
             }
         });
-
+        
         // 모바일에서 스크롤 시 헤더 숨기기/보이기
         let lastScrollTop = 0;
         let scrollTimeout;
         const stickyList = document.querySelector('.sticky-chat-list');
-
+        
         function handleScroll() {
             // 모바일에서만 동작
             if (window.innerWidth <= 768 && stickyList) {
                 const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-
+                
                 clearTimeout(scrollTimeout);
-
+                
                 if (scrollTop > lastScrollTop && scrollTop > 100) {
                     // 아래로 스크롤 - 헤더 숨기기
                     stickyList.classList.add('hidden');
@@ -2942,32 +2945,32 @@
                     // 위로 스크롤 - 헤더 보이기
                     stickyList.classList.remove('hidden');
                 }
-
+                
                 // 스크롤이 멈췄을 때 헤더 다시 보이기
                 scrollTimeout = setTimeout(() => {
                     if (scrollTop < 200) {
                         stickyList.classList.remove('hidden');
                     }
                 }, 1000);
-
+                
                 lastScrollTop = scrollTop <= 0 ? 0 : scrollTop;
             }
         }
-
+        
         window.addEventListener('scroll', handleScroll, { passive: true });
-
+        
         // 현재 보고 있는 채팅 하이라이트
         const observerOptions = {
             root: null,
             rootMargin: '-100px 0px -70% 0px',
             threshold: 0
         };
-
+        
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 const id = entry.target.id;
                 const link = document.querySelector(\`a[href="#\${id}"]\`);
-
+                
                 if (link) {
                     if (entry.isIntersecting) {
                         // 현재 보고 있는 섹션의 링크 하이라이트
@@ -2979,13 +2982,13 @@
                 }
             });
         }, observerOptions);
-
+        
         // 모든 채팅 섹션 관찰
         document.addEventListener('DOMContentLoaded', function() {
             document.querySelectorAll('.chat-section').forEach(section => {
                 observer.observe(section);
             });
-
+            
             // 모바일에서 기본적으로 채팅 목록 접기
             if (window.innerWidth < 768) {
                 const header = document.querySelector('.chat-list-header');
@@ -3018,7 +3021,7 @@
         processMarkdownHtml(container) {
             console.log('processMarkdownHtml 시작');
             let result = '';
-
+            
             // 컨테이너의 자식 요소들을 순회
             container.childNodes.forEach(node => {
                 if (node.nodeType === Node.ELEMENT_NODE) {
@@ -3027,7 +3030,7 @@
                         const codeElement = node.querySelector('code');
                         const codeContent = codeElement.textContent || codeElement.innerText;
                         console.log('코드블럭 발견:', codeContent);
-
+                        
                         result += `<div class="code-block" style="
                             background: rgba(0, 0, 0, 0.1) !important;
                             border: 1px solid rgba(0, 0, 0, 0.2) !important;
@@ -3045,7 +3048,7 @@
                     else if (node.tagName === 'BLOCKQUOTE') {
                         const quoteContent = node.textContent || node.innerText;
                         console.log('인용구 발견:', quoteContent);
-
+                        
                         result += `<div class="quote-block" style="
                             border-left: 3px solid rgba(0, 0, 0, 0.3) !important;
                             margin: 8px 0 !important;
@@ -3060,7 +3063,7 @@
                         const level = node.tagName.charAt(1);
                         const headingContent = node.textContent || node.innerText;
                         console.log(`헤딩 ${level} 발견:`, headingContent);
-
+                        
                         const size = Math.max(14, 20 - parseInt(level) * 1);
                         result += `<h${level} style="
                             font-size: ${size}px !important;
@@ -3074,7 +3077,7 @@
                     else if (node.tagName === 'UL') {
                         console.log('리스트(UL) 발견');
                         result += '<ul style="padding-left: 20px !important; margin: 8px 0 !important;">';
-
+                        
                         // 모든 LI 자식 요소들 처리
                         Array.from(node.children).forEach(li => {
                             if (li.tagName === 'LI') {
@@ -3083,7 +3086,7 @@
                                 </li>`;
                             }
                         });
-
+                        
                         result += '</ul>';
                     }
                     // 일반 div 처리
@@ -3103,14 +3106,14 @@
                     result += this.escapeHtml(node.textContent);
                 }
             });
-
+            
             console.log('processMarkdownHtml 결과:', result);
             return result;
         }
 
         processParagraphNode(node) {
             let result = '';
-
+            
             node.childNodes.forEach(child => {
                 if (child.nodeType === Node.TEXT_NODE) {
                     result += this.escapeHtml(child.textContent);
@@ -3130,7 +3133,7 @@
                     }
                 }
             });
-
+            
             return result;
         }
 
@@ -3138,7 +3141,7 @@
             console.log('formatRawText 시작 - 입력 텍스트:', text);
             // 코드블럭을 HTML로 변환
             let formatted = text;
-
+            
             // ``` 코드블럭 처리
             formatted = formatted.replace(/```([\s\S]*?)```/g, (match, content) => {
                 console.log('코드블럭 감지됨:', match);
@@ -3157,7 +3160,7 @@
                     color: inherit;
                 "><pre style="margin: 0; white-space: pre-wrap;">${content.trim()}</pre></div>`;
             });
-
+            
             // > 인용구 처리
             formatted = formatted.replace(/^>\s*(.+)$/gm, (match, content) => {
                 console.log('인용구 감지됨:', match);
@@ -3170,7 +3173,7 @@
                     border-radius: 0 4px 4px 0;
                 ">${content}</div>`;
             });
-
+            
             // # 헤딩 처리
             formatted = formatted.replace(/^#{1,6}\s*(.+)$/gm, (match, content) => {
                 const level = match.match(/^#+/)[0].length;
@@ -3183,18 +3186,18 @@
                     line-height: 1.3;
                 ">${content}</h${level}>`;
             });
-
+            
             // 리스트 처리
             // 리스트 블록 추출
             const listBlocks = [];
             let inList = false;
             let currentList = [];
             const lines = formatted.split('\n');
-
+            
             for (let i = 0; i < lines.length; i++) {
                 const line = lines[i].trim();
                 const isListItem = /^-\s+(.*)$|^\*\s+(.*)$|^\d+\.\s+(.*)$/.test(line);
-
+                
                 if (isListItem) {
                     if (!inList) {
                         inList = true;
@@ -3217,17 +3220,17 @@
                     inList = false;
                 }
             }
-
+            
             // 마지막 리스트가 있다면 추가
             if (inList && currentList.length > 0) {
                 listBlocks.push(currentList.join('\n'));
             }
-
+            
             // 리스트 블록을 HTML로 변환
             listBlocks.forEach(block => {
                 const items = block.split('\n');
                 let listHtml = '<ul style="padding-left: 20px; margin: 8px 0;">';
-
+                
                 items.forEach(item => {
                     const match = item.match(/^(?:-\s+|\*\s+|\d+\.\s+)(.*)$/);
                     if (match) {
@@ -3235,50 +3238,50 @@
                         listHtml += `<li style="margin: 4px 0; list-style-type: disc;">${content}</li>`;
                     }
                 });
-
+                
                 listHtml += '</ul>';
                 formatted = formatted.replace(block, listHtml);
             });
-
+            
             // ** 굵게 처리
             formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
+            
             // * 기울임 처리 (** 처리 후)
             formatted = formatted.replace(/\*((?!\*)[^*]+)\*/g, '<em>$1</em>');
-
+            
             // 줄바꿈을 <br>로 변환 (단, 이미 처리된 블록 요소는 제외)
             const formattedLines = formatted.split('\n');
             let result = '';
             let inBlock = false;
-
+            
             for (let i = 0; i < formattedLines.length; i++) {
                 const line = formattedLines[i];
-
-                if (line.includes('<div class="code-block"') ||
-                    line.includes('<div class="quote-block"') ||
+                
+                if (line.includes('<div class="code-block"') || 
+                    line.includes('<div class="quote-block"') || 
                     line.includes('<h') ||
                     line.includes('<ul') ||
                     line.includes('<li')) {
                     inBlock = true;
                 }
-
-                if (line.includes('</div>') ||
+                
+                if (line.includes('</div>') || 
                     line.includes('</h') ||
                     line.includes('</ul>')) {
                     inBlock = false;
                 }
-
+                
                 if (!inBlock && line.trim() === '' && i < formattedLines.length - 1) {
                     result += '<br>';
                 } else {
                     result += line;
                 }
-
+                
                 if (i < formattedLines.length - 1) {
                     result += '\n';
                 }
             }
-
+            
             console.log('formatRawText 결과:', result);
             return result;
         }
@@ -3312,7 +3315,7 @@
                 data.messages.forEach((msg, index) => {
                     const speaker = msg.author === '사용자' ? '👤 나' : `🤖 ${data.characterName || 'AI'}`;
                     txt += `[${index + 1}] ${speaker}:\n`;
-
+                    
                     if (msg.content) {
                         msg.content.forEach(contentItem => {
                             if (contentItem.type === 'paragraph') {
@@ -3339,7 +3342,7 @@
                                     const tempDiv = document.createElement('div');
                                     tempDiv.innerHTML = contentItem.htmlContent;
                                     const messageContainer = tempDiv.firstChild;
-
+                                    
                                     if (messageContainer) {
                                         // HTML DOM을 원본 마크다운 형태로 변환
                                         txt += this.convertHtmlToMarkdown(messageContainer) + '\n';
@@ -3356,7 +3359,7 @@
                     } else if (msg.message) {
                         txt += msg.message + '\n';
                     }
-
+                    
                     txt += '\n';
                 });
             }
@@ -3368,12 +3371,12 @@
                     txt += `\n채팅 ${chatIndex + 1}: ${chat.characterName}\n`;
                     txt += `메시지 수: ${chat.messages ? chat.messages.length : 0}개\n`;
                     txt += '----------------------------------------\n';
-
+                    
                     if (chat.messages) {
                         chat.messages.forEach((msg, msgIndex) => {
                             const speaker = msg.author === '사용자' ? '👤 나' : `🤖 ${chat.characterName}`;
                             txt += `[${msgIndex + 1}] ${speaker}:\n`;
-
+                            
                             if (msg.content) {
                                 msg.content.forEach(contentItem => {
                                     if (contentItem.type === 'paragraph') {
@@ -3398,7 +3401,7 @@
                             } else if (msg.message) {
                                 txt += msg.message + '\n';
                             }
-
+                            
                             txt += '\n';
                         });
                     }
@@ -3412,7 +3415,7 @@
         // HTML DOM을 마크다운 텍스트로 변환
         convertHtmlToMarkdown(container) {
             let result = '';
-
+            
             // 컨테이너의 자식 요소들을 순회
             container.childNodes.forEach(node => {
                 if (node.nodeType === Node.ELEMENT_NODE) {
@@ -3493,7 +3496,7 @@
                     result += node.textContent;
                 }
             });
-
+            
             return result.trim();
         }
     }
@@ -3501,18 +3504,18 @@
     // 스크립트 초기화
     async function initScript() {
         console.log('🚀 뤼튼 크랙 채팅 백업 스크립트 초기화 중...');
-
+        
         // 페이지 로드 시 백업 진행 상태 확인
         const inProgress = localStorage.getItem('wrtn_backup_in_progress') === 'true';
-
+        
         // URL 체크
         if (window.location.pathname.match(/\/u\/[a-f0-9]+\/c\/[a-f0-9]+/)) {
             console.log('✅ 채팅방 페이지 감지됨');
-
+            
             // BackupUI 인스턴스 생성
             try {
                 const ui = new BackupUI();
-
+                
                 // 백업 진행 중이면 자동으로 재개
                 if (inProgress) {
                     console.log('🔄 백업 진행 중 감지, 프로세스 재개...');
@@ -3520,14 +3523,14 @@
                         ui.resumeBackupProcess();
                     }, 1000);
                 }
-
+                
                 console.log('✅ 백업 UI 생성 완료!');
             } catch (error) {
                 console.error('❌ 백업 UI 생성 실패:', error);
             }
         } else {
             console.log('⚠️ 채팅방이 아닙니다. 메인 페이지에서만 백업 기능이 활성화됩니다.');
-
+            
             // 메인 페이지에서도 백업 상태를 확인하고 UI 초기화
             if (window.location.pathname === '/' || window.location.pathname.match(/^\/u\/[a-f0-9]+$/)) {
                 try {
@@ -3542,7 +3545,7 @@
     // 페이지 로드 및 URL 변경 감지
     function watchForChanges() {
         let lastUrl = location.href;
-
+        
         new MutationObserver(() => {
             const url = location.href;
             if (url !== lastUrl) {
@@ -3560,13 +3563,13 @@
         } else {
             setTimeout(initScript, 1000);
         }
-
+        
         // URL 변경 감지
         watchForChanges();
-
+        
         console.log('💾 뤼튼 크랙 채팅 백업 스크립트가 로드되었습니다.');
     } else {
         console.log('⚠️ 뤼튼 크랙 웹사이트가 아닙니다. 스크립트를 건너뜁니다.');
     }
 
-})();
+})(); 
