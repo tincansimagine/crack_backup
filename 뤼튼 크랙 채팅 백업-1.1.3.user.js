@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         뤼튼 크랙 채팅 백업
 // @namespace    http://tampermonkey.net/
-// @version      1.1.2
-// @description  뤼튼 크랙(Wrtn Crack) 웹사이트에서 채팅 내역을 백업하는 스크립트 (모바일 지원 강화, HTML 마크다운/목록 지원)
+// @version      1.1.3
+// @description  뤼튼 크랙(Wrtn Crack) 웹사이트에서 채팅 내역을 백업하는 스크립트 (모바일 지원 강화, HTML 마크다운/목록 지원) / 무단으로 동의 없는 재업로드 하지말아주세요 ㅠㅠ...
 // @author       케츠
 // @match        https://crack.wrtn.ai/*
 // @icon         https://crack.wrtn.ai/favicon.ico
@@ -646,7 +646,7 @@
                                 const childElements = messageContainer.children;
 
                                 for (let childElement of childElements) {
-                                    if (childElement.classList.contains('css-l6zbeu')) {
+                                    if (childElement.classList.contains('css-l6zbeu') || childElement.classList.contains('css-1dfojlr')) {
                                         // 텍스트 콘텐츠
                                         let paragraphNodes = [];
 
@@ -726,7 +726,7 @@
                                 const childElements = userMessageContainer.children;
 
                                 for (let childElement of childElements) {
-                                    if (childElement.classList.contains('css-l8rc0l')) {
+                                    if (childElement.classList.contains('css-l8rc0l') || childElement.classList.contains('css-192kozn')) {
                                         // 사용자 텍스트 콘텐츠
                                         let paragraphNodes = [];
 
@@ -793,8 +793,9 @@
                         if (content.length === 0) {
                             const userSelectors = [
                                 '.message-bubble div[class*="css-l8rc0l"]',
+                                '.message-bubble div[class*="css-192kozn"]',
                                 '.message-bubble div[class*="user-message"]',
-                                '.message-bubble div:not([class*="css-l6zbeu"])'
+                                '.message-bubble div:not([class*="css-l6zbeu"]):not([class*="css-1dfojlr"])'
                             ];
 
                             let userMessageBubble = null;
@@ -3237,7 +3238,7 @@
                         result += '</ul>';
                     }
                     // 일반 div 처리
-                    else if (node.tagName === 'DIV' && node.classList.contains('css-l6zbeu')) {
+                    else if (node.tagName === 'DIV' && (node.classList.contains('css-l6zbeu') || node.classList.contains('css-1dfojlr'))) {
                         // 일반 텍스트 단락
                         const paragraphContent = this.processParagraphNode(node);
                         if (paragraphContent) {
