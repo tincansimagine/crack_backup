@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         뤼튼 크랙 채팅 백업
 // @namespace    http://tampermonkey.net/
-// @version      1.1.3
-// @description  뤼튼 크랙(Wrtn Crack) 웹사이트에서 채팅 내역을 백업하는 스크립트 (모바일 지원 강화, HTML 마크다운/목록 지원) / 무단으로 동의 없는 재업로드 하지말아주세요 ㅠㅠ...
+// @version      1.1.4
+// @description  뤼튼 크랙(Wrtn Crack) 웹사이트에서 채팅 내역을 백업하는 스크립트 (모바일 지원 강화, HTML 마크다운/목록 지원)  무단으로 동의 없는 재업로드 하지말아주세요 ㅠㅠ...
 // @author       케츠
 // @match        https://crack.wrtn.ai/*
 // @icon         https://crack.wrtn.ai/favicon.ico
@@ -106,7 +106,9 @@
                     '[class*="sidebar"]',
                     '[class*="side"]',
                     'nav',
-                    '[class*="nav"]'
+                    '[class*="nav"]',
+                    '.css-kvsjdq', // 뤼튼 크랙의 채팅 목록 컨테이너
+                    'div[class*="css-kvsjdq"]'
                 ];
 
                 let chatListContainer = null;
@@ -116,7 +118,16 @@
                 }
 
                 if (!chatListContainer) {
-                    throw new Error('사이드바 컨테이너를 찾을 수 없습니다.');
+                    // 채팅 링크를 통해 컨테이너 찾기
+                    const chatLink = document.querySelector('a[href*="/u/"][href*="/c/"]');
+                    if (chatLink) {
+                        chatListContainer = chatLink.closest('div[class*="css-kvsjdq"]') ||
+                                          chatLink.closest('[display="flex"]')?.parentElement;
+                    }
+
+                    if (!chatListContainer) {
+                        throw new Error('사이드바 컨테이너를 찾을 수 없습니다.');
+                    }
                 }
 
                 // 스크롤 가능한 컨테이너 찾기
@@ -124,10 +135,15 @@
 
                 // 아직 찾지 못했다면 다시 시도
                 if (!scrollContainer) {
-                    scrollContainer = chatListContainer.querySelector('[class*="css-kvsjdq"]') ||
-                                     chatListContainer.querySelector('[style*="overflow-y"]') ||
-                                     chatListContainer.querySelector('[class*="scroll"]') ||
-                                     chatListContainer;
+                    // chatListContainer 자체가 css-kvsjdq인 경우가 많음
+                    if (chatListContainer.classList.contains('css-kvsjdq')) {
+                        scrollContainer = chatListContainer;
+                    } else {
+                        scrollContainer = chatListContainer.querySelector('[class*="css-kvsjdq"]') ||
+                                         chatListContainer.querySelector('[style*="overflow-y"]') ||
+                                         chatListContainer.querySelector('[class*="scroll"]') ||
+                                         chatListContainer;
+                    }
                 }
 
                 console.log('스크롤 컨테이너 찾음:', scrollContainer);
